@@ -1,0 +1,439 @@
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../**/*.blade.php';
+@source '../**/*.js';
+
+@theme {
+    --font-sans: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    --font-mono: 'JetBrains Mono', 'Courier New', Courier, ui-monospace, monospace;
+    
+    /* Font sizes increased by 25% */
+    --font-size-xs: 0.9375rem;
+    --font-size-sm: 1.09375rem;
+    --font-size-base: 1.25rem;
+    --font-size-lg: 1.40625rem;
+    --font-size-xl: 1.5625rem;
+    --font-size-2xl: 1.875rem;
+    --font-size-3xl: 2.34375rem;
+    --font-size-4xl: 2.8125rem;
+    --font-size-5xl: 3.75rem;
+    --font-size-6xl: 4.6875rem;
+    --font-size-7xl: 5.625rem;
+    --font-size-8xl: 7.5rem;
+    --font-size-9xl: 10rem;
+    
+    --color-void: #050505;
+    --color-obsidian: #0a0a0a;
+    --color-charcoal: #141414;
+    --color-smoke: #1a1a1a;
+    --color-ash: #2a2a2a;
+    --color-steel: #888888;
+    --color-mist: #aaaaaa;
+    --color-silver: #999999;
+    --color-fog: #aaaaaa;
+    --color-cloud: #cccccc;
+    --color-snow: #e8e8e8;
+    --color-white: #f5f5f5;
+}
+
+/* Base setup */
+html {
+    scroll-behavior: smooth;
+}
+
+/* Font loading with font-display: swap to prevent layout shift and render blocking */
+@font-face {
+    font-family: 'Cormorant Garamond';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_qE6GnM.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Cormorant Garamond';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_v86GnM.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Cormorant Garamond';
+    font-style: normal;
+    font-weight: 500;
+    font-display: swap;
+    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_s06GnM.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Cormorant Garamond';
+    font-style: normal;
+    font-weight: 600;
+    font-display: swap;
+    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_iE9GnM.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'Cormorant Garamond';
+    font-style: italic;
+    font-weight: 400;
+    font-display: swap;
+    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd58jDOjw.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 300;
+    font-display: swap;
+    src: url('https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8lqxjPQ.ttf') format('truetype');
+}
+
+@font-face {
+    font-family: 'JetBrains Mono';
+    font-style: normal;
+    font-weight: 400;
+    font-display: swap;
+    src: url('https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8yKxjPQ.ttf') format('truetype');
+}
+
+::selection {
+    background: var(--color-ash);
+    color: var(--color-snow);
+}
+
+/* Performant scrollbar */
+::-webkit-scrollbar {
+    width: 6px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--color-obsidian);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--color-steel);
+    border-radius: 3px;
+}
+
+/* ========================================
+   GEOMETRIC FLOURISHES (CSS-only, GPU-optimized)
+   ======================================== */
+
+/* Concentric circles - orbital decoration */
+.orbital {
+    --orbital-size: 400px;
+    position: absolute;
+    width: var(--orbital-size);
+    height: var(--orbital-size);
+    pointer-events: none;
+}
+
+.orbital::before,
+.orbital::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid var(--color-ash);
+}
+
+.orbital::before {
+    inset: 0;
+    opacity: 0.4;
+}
+
+.orbital::after {
+    inset: 15%;
+    border-style: dashed;
+    opacity: 0.3;
+}
+
+.orbital-ring {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid var(--color-steel);
+    opacity: 0.2;
+}
+
+/* Dot on orbit */
+.orbital-dot {
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: var(--color-mist);
+    border-radius: 50%;
+}
+
+/* Radiating lines from a point */
+.radial-burst {
+    --burst-size: 120px;
+    position: relative;
+    width: var(--burst-size);
+    height: var(--burst-size);
+}
+
+.radial-burst::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: 
+        repeating-conic-gradient(
+            from 0deg,
+            var(--color-steel) 0deg 1deg,
+            transparent 1deg 15deg
+        );
+    opacity: 0.3;
+    border-radius: 50%;
+}
+
+/* Frequency bars / waveform */
+.frequency-bars {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    height: 40px;
+}
+
+.frequency-bars span {
+    width: 2px;
+    background: var(--color-steel);
+    opacity: 0.6;
+}
+
+/* Dot matrix pattern */
+.dot-matrix {
+    --dot-size: 2px;
+    --dot-gap: 16px;
+    background-image: radial-gradient(
+        circle at center,
+        var(--color-steel) var(--dot-size),
+        transparent var(--dot-size)
+    );
+    background-size: var(--dot-gap) var(--dot-gap);
+    opacity: 0.4;
+}
+
+/* Horizontal ruled lines */
+.ruled-lines {
+    background-image: repeating-linear-gradient(
+        0deg,
+        transparent,
+        transparent 11px,
+        var(--color-ash) 11px,
+        var(--color-ash) 12px
+    );
+    opacity: 0.3;
+}
+
+/* Concentric arcs (quarter circles) */
+.arc-group {
+    position: absolute;
+    pointer-events: none;
+}
+
+.arc {
+    position: absolute;
+    border-radius: 50%;
+    border: 1px solid var(--color-steel);
+    border-color: var(--color-steel) transparent transparent transparent;
+}
+
+/* Wave line SVG background */
+.wave-line {
+    position: absolute;
+    width: 200px;
+    height: 60px;
+    opacity: 0.3;
+}
+
+/* Tick marks (like a ruler or clock) */
+.tick-ring {
+    position: absolute;
+    border-radius: 50%;
+    background: repeating-conic-gradient(
+        from 0deg,
+        var(--color-steel) 0deg 0.5deg,
+        transparent 0.5deg 6deg
+    );
+    opacity: 0.25;
+}
+
+/* Dashed circle */
+.dashed-circle {
+    border-radius: 50%;
+    border: 1px dashed var(--color-steel);
+    opacity: 0.3;
+}
+
+/* ========================================
+   LINE DECORATIONS
+   ======================================== */
+
+.line-dot {
+    display: flex;
+    align-items: center;
+}
+
+.line-dot::before,
+.line-dot::after {
+    content: '';
+    height: 1px;
+    background: var(--color-steel);
+}
+
+.line-dot::before { width: 40px; }
+.line-dot::after { width: 30px; }
+
+.line-dot .dot {
+    width: 4px;
+    height: 4px;
+    background: var(--color-mist);
+    border-radius: 50%;
+    margin: 0 8px;
+}
+
+/* Section header line */
+.section-line {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.section-line::before {
+    content: '';
+    width: 24px;
+    height: 1px;
+    background: var(--color-steel);
+}
+
+.section-line::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(to right, var(--color-steel), transparent);
+}
+
+.section-line-end {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.section-line-end .dot {
+    width: 4px;
+    height: 4px;
+    background: var(--color-mist);
+    border-radius: 50%;
+}
+
+.section-line-end::after {
+    content: '';
+    width: 40px;
+    height: 1px;
+    background: var(--color-steel);
+}
+
+/* Corner brackets */
+.corner-brackets {
+    position: relative;
+    padding: 4px 12px;
+}
+
+.corner-brackets::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 8px;
+    height: 8px;
+    border-left: 1px solid var(--color-steel);
+    border-top: 1px solid var(--color-steel);
+}
+
+.corner-brackets::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    right: 0;
+    width: 8px;
+    height: 8px;
+    border-right: 1px solid var(--color-steel);
+    border-bottom: 1px solid var(--color-steel);
+}
+
+/* ========================================
+   HOVER EFFECTS
+   ======================================== */
+
+.hover-line {
+    position: relative;
+    display: inline-block;
+}
+
+.hover-line::after {
+    content: '';
+    position: absolute;
+    bottom: -2px;
+    left: 0;
+    width: 0;
+    height: 1px;
+    background: var(--color-fog);
+    transition: width 0.3s ease;
+}
+
+.hover-line:hover::after {
+    width: 100%;
+}
+
+/* External arrow animation */
+.external-arrow svg {
+    transition: transform 0.2s ease;
+}
+
+.external-arrow:hover svg {
+    transform: translate(2px, -2px);
+}
+
+/* ========================================
+   SUBTLE ANIMATIONS (GPU-optimized)
+   ======================================== */
+
+@keyframes slow-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes pulse-opacity {
+    0%, 100% { opacity: 0.2; }
+    50% { opacity: 0.4; }
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-8px); }
+}
+
+.animate-slow-spin {
+    animation: slow-spin 120s linear infinite;
+}
+
+.animate-pulse-opacity {
+    animation: pulse-opacity 4s ease-in-out infinite;
+}
+
+.animate-float {
+    animation: float 6s ease-in-out infinite;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .animate-slow-spin,
+    .animate-pulse-opacity,
+    .animate-float {
+        animation: none;
+    }
+}
