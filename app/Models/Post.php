@@ -19,6 +19,7 @@ class Post extends Model
     protected $fillable = [
         'title',
         'content',
+        'excerpt',
         'slug',
     ];
 
@@ -82,5 +83,23 @@ class Post extends Model
     public function getOrderedImages(): \Illuminate\Database\Eloquent\Collection
     {
         return $this->images()->orderBy('order')->get();
+    }
+
+    /**
+     * Get the excerpt for the post, auto-generating if empty.
+     */
+    public function getDisplayExcerptAttribute(): string
+    {
+        $excerpt = $this->attributes['excerpt'] ?? null;
+
+        if (! empty($excerpt)) {
+            return $excerpt;
+        }
+
+        // Auto-generate excerpt from content (first 250 characters, stripped of markdown)
+        $content = $this->attributes['content'] ?? '';
+        $plainText = strip_tags(str($content)->markdown(['html_input' => 'strip', 'allow_unsafe_links' => false]));
+
+        return Str::limit($plainText, 250);
     }
 }

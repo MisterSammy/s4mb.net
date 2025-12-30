@@ -22,6 +22,12 @@ class PostResource extends Resource
             ->schema([
                 Forms\Components\TextInput::make('title')
                     ->required(),
+                Forms\Components\Textarea::make('excerpt')
+                    ->label('Excerpt')
+                    ->helperText('A short summary of the post. If left empty, it will be auto-generated from the content.')
+                    ->rows(3)
+                    ->maxLength(500)
+                    ->columnSpanFull(),
                 Forms\Components\MarkdownEditor::make('content')
                     ->required()
                     ->fileAttachmentsDisk('public')

@@ -46,6 +46,7 @@
 
             {{-- Hero Section with Geometric Decorations --}}
             <section class="pt-24 pb-20 border-b border-charcoal relative overflow-hidden">
+                <div class="dot-matrix absolute inset-0" style="--dot-gap: 40px; --dot-size: 1px;"></div>
                 {{-- Large orbital decoration --}}
                 <div class="orbital absolute -right-48 top-1/2 -translate-y-1/2 animate-slow-spin" style="--orbital-size: 500px;">
                     <div class="orbital-ring absolute inset-[30%]"></div>
@@ -95,9 +96,14 @@
                             </div>
                         </div>
 
-                        <h1 class="text-4xl md:text-5xl lg:text-6xl font-light text-snow tracking-tight mb-6">
-                            {{ config('app.name', 'Sam') }}
-                        </h1>
+                        <pre class="font-mono text-xs text-mist leading-tight mb-6 whitespace-pre">
+                            <code> 
+      ____       __ 
+  ___/ / /__ _  / / 
+ (_-<_  _/  ' \/ _ \
+/___//_//_/_/_/_.__/
+                    
+                            </code></pre>
                         <p class="text-lg md:text-xl text-silver leading-relaxed mb-8 max-w-lg">
                             Developer and writer. Sharing thoughts on 
                             <em class="text-fog">code</em>, 
@@ -163,23 +169,25 @@
                                         {{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}
                                     </span>
 
-                                    <a href="{{ route('posts.show', $post) }}" class="flex flex-col md:flex-row md:items-center justify-between py-6 gap-4 transition-colors hover:bg-charcoal/30 -mx-4 px-4 rounded" style="min-height: 60px;">
-                                        {{-- Post title with arrow --}}
-                                        <div class="flex items-center gap-3 min-w-0 flex-1">
-                                            <h2 class="text-xl md:text-2xl font-light text-cloud group-hover:text-snow transition-colors">
-                                                {{ $post->title }}
-                                            </h2>
-                                            <svg class="w-4 h-4 text-mist group-hover:text-silver transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
-                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 17L17 7M17 7H7M17 7V17"/>
-                                            </svg>
-                                        </div>
+                                    <a href="{{ route('posts.show', $post) }}" class="block py-6 transition-colors hover:bg-charcoal/30 -mx-4 px-4 rounded">
+                                        <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                                            {{-- Post title and excerpt --}}
+                                            <div class="flex-1 min-w-0">
+                                                <div class="flex items-center gap-3 mb-2">
+                                                    <h2 class="text-xl md:text-2xl font-light text-cloud group-hover:text-snow transition-colors">
+                                                        {{ $post->title }}
+                                                    </h2>
+                                                    <svg class="w-4 h-4 text-mist group-hover:text-silver transition-all group-hover:translate-x-0.5 group-hover:-translate-y-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" style="width: 16px; height: 16px;">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 17L17 7M17 7H7M17 7V17"/>
+                                                    </svg>
+                                                </div>
+                                                <p class="text-sm text-mist font-mono line-clamp-2">
+                                                    {{ Str::limit($post->display_excerpt, 200) }}
+                                                </p>
+                                            </div>
 
-                                        {{-- Post meta --}}
-                                        <div class="flex items-center gap-4 flex-shrink-0">
-                                            <span class="text-sm text-mist font-mono line-clamp-1 max-w-[200px]">
-                                                {{ Str::limit(strip_tags(str($post->content)->markdown(['html_input' => 'strip', 'allow_unsafe_links' => false])), 40) }}
-                                            </span>
-                                            <div class="flex items-center gap-2">
+                                            {{-- Post date --}}
+                                            <div class="flex items-center gap-2 flex-shrink-0">
                                                 <span class="w-1 h-1 rounded-full bg-steel" style="width: 4px; height: 4px;"></span>
                                                 <time class="text-xs text-steel font-mono whitespace-nowrap">
                                                     {{ $post->created_at->format('M Y') }}
