@@ -7,7 +7,7 @@
 @source '../**/*.js';
 
 @theme {
-    --font-sans: 'Cormorant Garamond', Georgia, 'Times New Roman', serif;
+    --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
     --font-mono: 'JetBrains Mono', 'Courier New', Courier, ui-monospace, monospace;
     
     /* Font sizes increased by 25% */
@@ -24,19 +24,21 @@
     --font-size-7xl: 5.625rem;
     --font-size-8xl: 7.5rem;
     --font-size-9xl: 10rem;
-    
-    --color-void: #050505;
-    --color-obsidian: #0a0a0a;
-    --color-charcoal: #141414;
-    --color-smoke: #1a1a1a;
-    --color-ash: #2a2a2a;
-    --color-steel: #888888;
-    --color-mist: #aaaaaa;
-    --color-silver: #999999;
-    --color-fog: #aaaaaa;
-    --color-cloud: #cccccc;
-    --color-snow: #e8e8e8;
-    --color-white: #f5f5f5;
+}
+
+/* ========================================
+   THEME CSS VARIABLES (injected by Blade)
+   These are fallbacks - the actual values come from the theme system
+   ======================================== */
+:root {
+    --color-background: #fbf5ef;
+    --color-surface: #f2d3ab;
+    --color-accent: #c69fa5;
+    --color-secondary-accent: #8b6d9c;
+    --color-text: #494d7e;
+    --color-text-muted: #6b6f9e;
+    --color-border: #d4c4b0;
+    --color-darkest: #272744;
 }
 
 /* Base setup */
@@ -44,46 +46,7 @@ html {
     scroll-behavior: smooth;
 }
 
-/* Font loading with font-display: swap to prevent layout shift and render blocking */
-@font-face {
-    font-family: 'Cormorant Garamond';
-    font-style: normal;
-    font-weight: 300;
-    font-display: swap;
-    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_qE6GnM.ttf') format('truetype');
-}
-
-@font-face {
-    font-family: 'Cormorant Garamond';
-    font-style: normal;
-    font-weight: 400;
-    font-display: swap;
-    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_v86GnM.ttf') format('truetype');
-}
-
-@font-face {
-    font-family: 'Cormorant Garamond';
-    font-style: normal;
-    font-weight: 500;
-    font-display: swap;
-    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_s06GnM.ttf') format('truetype');
-}
-
-@font-face {
-    font-family: 'Cormorant Garamond';
-    font-style: normal;
-    font-weight: 600;
-    font-display: swap;
-    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3umX5slCNuHLi8bLeY9MK7whWMhyjypVO7abI26QOD_iE9GnM.ttf') format('truetype');
-}
-
-@font-face {
-    font-family: 'Cormorant Garamond';
-    font-style: italic;
-    font-weight: 400;
-    font-display: swap;
-    src: url('https://fonts.gstatic.com/s/cormorantgaramond/v21/co3smX5slCNuHLi8bLeY9MK7whWMhyjYrGFEsdtdc62E6zd58jDOjw.ttf') format('truetype');
-}
+/* Inter font is loaded via Google Fonts link tag in HTML head */
 
 @font-face {
     font-family: 'JetBrains Mono';
@@ -102,8 +65,8 @@ html {
 }
 
 ::selection {
-    background: var(--color-ash);
-    color: var(--color-snow);
+    background: var(--color-secondary-accent);
+    color: var(--color-background);
 }
 
 /* Performant scrollbar */
@@ -112,12 +75,69 @@ html {
 }
 
 ::-webkit-scrollbar-track {
-    background: var(--color-obsidian);
+    background: var(--color-background);
 }
 
 ::-webkit-scrollbar-thumb {
-    background: var(--color-steel);
-    border-radius: 3px;
+    background: var(--color-border);
+    border-radius: 0; /* Pixel art style - no rounded corners */
+}
+
+/* ========================================
+   PIXEL ART INSPIRED ELEMENTS
+   ======================================== */
+
+/* Pixel grid background - subtle decorative pattern */
+.pixel-grid {
+    background-image: 
+        linear-gradient(to right, var(--color-border) 1px, transparent 1px),
+        linear-gradient(to bottom, var(--color-border) 1px, transparent 1px);
+    background-size: 8px 8px;
+    opacity: 0.15;
+}
+
+/* Pixel dots pattern */
+.pixel-dots {
+    background-image: radial-gradient(
+        circle at center,
+        var(--color-accent) 1px,
+        transparent 1px
+    );
+    background-size: 4px 4px;
+    opacity: 0.3;
+}
+
+/* Pixel border utility - crisp 1px borders */
+.pixel-border {
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+}
+
+/* Pixel shadow - retro-style offset shadow */
+.pixel-shadow {
+    box-shadow: 2px 2px 0 var(--color-darkest);
+}
+
+/* Stepped/dithered gradient effect */
+.pixel-fade {
+    position: relative;
+}
+
+.pixel-fade::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: repeating-linear-gradient(
+        90deg,
+        var(--color-surface) 0px,
+        var(--color-surface) 2px,
+        transparent 2px,
+        transparent 4px
+    );
+    opacity: 0.5;
 }
 
 /* ========================================
@@ -138,7 +158,7 @@ html {
     content: '';
     position: absolute;
     border-radius: 50%;
-    border: 1px solid var(--color-ash);
+    border: 1px solid var(--color-border);
 }
 
 .orbital::before {
@@ -155,7 +175,7 @@ html {
 .orbital-ring {
     position: absolute;
     border-radius: 50%;
-    border: 1px solid var(--color-steel);
+    border: 1px solid var(--color-secondary-accent);
     opacity: 0.2;
 }
 
@@ -164,8 +184,8 @@ html {
     position: absolute;
     width: 6px;
     height: 6px;
-    background: var(--color-mist);
-    border-radius: 50%;
+    background: var(--color-accent);
+    border-radius: 0; /* Pixel style - square dot */
 }
 
 /* Radiating lines from a point */
@@ -183,7 +203,7 @@ html {
     background: 
         repeating-conic-gradient(
             from 0deg,
-            var(--color-steel) 0deg 1deg,
+            var(--color-secondary-accent) 0deg 1deg,
             transparent 1deg 15deg
         );
     opacity: 0.3;
@@ -200,21 +220,21 @@ html {
 
 .frequency-bars span {
     width: 2px;
-    background: var(--color-steel);
+    background: var(--color-accent);
     opacity: 0.6;
 }
 
-/* Dot matrix pattern */
+/* Dot matrix pattern - updated for pixel art style */
 .dot-matrix {
-    --dot-size: 2px;
-    --dot-gap: 16px;
+    --dot-size: 1px;
+    --dot-gap: 8px;
     background-image: radial-gradient(
         circle at center,
-        var(--color-steel) var(--dot-size),
+        var(--color-secondary-accent) var(--dot-size),
         transparent var(--dot-size)
     );
     background-size: var(--dot-gap) var(--dot-gap);
-    opacity: 0.4;
+    opacity: 0.25;
 }
 
 /* Horizontal ruled lines */
@@ -222,11 +242,11 @@ html {
     background-image: repeating-linear-gradient(
         0deg,
         transparent,
-        transparent 11px,
-        var(--color-ash) 11px,
-        var(--color-ash) 12px
+        transparent 7px,
+        var(--color-border) 7px,
+        var(--color-border) 8px
     );
-    opacity: 0.3;
+    opacity: 0.2;
 }
 
 /* Concentric arcs (quarter circles) */
@@ -238,8 +258,8 @@ html {
 .arc {
     position: absolute;
     border-radius: 50%;
-    border: 1px solid var(--color-steel);
-    border-color: var(--color-steel) transparent transparent transparent;
+    border: 1px solid var(--color-accent);
+    border-color: var(--color-accent) transparent transparent transparent;
 }
 
 /* Wave line SVG background */
@@ -256,17 +276,17 @@ html {
     border-radius: 50%;
     background: repeating-conic-gradient(
         from 0deg,
-        var(--color-steel) 0deg 0.5deg,
+        var(--color-secondary-accent) 0deg 0.5deg,
         transparent 0.5deg 6deg
     );
-    opacity: 0.25;
+    opacity: 0.2;
 }
 
-/* Dashed circle */
+/* Dashed circle - pixel art style (no rounded dash) */
 .dashed-circle {
     border-radius: 50%;
-    border: 1px dashed var(--color-steel);
-    opacity: 0.3;
+    border: 1px dashed var(--color-accent);
+    opacity: 0.4;
 }
 
 /* ========================================
@@ -282,7 +302,7 @@ html {
 .line-dot::after {
     content: '';
     height: 1px;
-    background: var(--color-steel);
+    background: var(--color-border);
 }
 
 .line-dot::before { width: 40px; }
@@ -291,8 +311,8 @@ html {
 .line-dot .dot {
     width: 4px;
     height: 4px;
-    background: var(--color-mist);
-    border-radius: 50%;
+    background: var(--color-accent);
+    border-radius: 0; /* Pixel style */
     margin: 0 8px;
 }
 
@@ -307,14 +327,14 @@ html {
     content: '';
     width: 24px;
     height: 1px;
-    background: var(--color-steel);
+    background: var(--color-border);
 }
 
 .section-line::after {
     content: '';
     flex: 1;
     height: 1px;
-    background: linear-gradient(to right, var(--color-steel), transparent);
+    background: linear-gradient(to right, var(--color-border), transparent);
 }
 
 .section-line-end {
@@ -326,18 +346,18 @@ html {
 .section-line-end .dot {
     width: 4px;
     height: 4px;
-    background: var(--color-mist);
-    border-radius: 50%;
+    background: var(--color-accent);
+    border-radius: 0; /* Pixel style */
 }
 
 .section-line-end::after {
     content: '';
     width: 40px;
     height: 1px;
-    background: var(--color-steel);
+    background: var(--color-border);
 }
 
-/* Corner brackets */
+/* Corner brackets - pixel art style */
 .corner-brackets {
     position: relative;
     padding: 4px 12px;
@@ -350,8 +370,8 @@ html {
     left: 0;
     width: 8px;
     height: 8px;
-    border-left: 1px solid var(--color-steel);
-    border-top: 1px solid var(--color-steel);
+    border-left: 2px solid var(--color-accent);
+    border-top: 2px solid var(--color-accent);
 }
 
 .corner-brackets::after {
@@ -361,8 +381,8 @@ html {
     right: 0;
     width: 8px;
     height: 8px;
-    border-right: 1px solid var(--color-steel);
-    border-bottom: 1px solid var(--color-steel);
+    border-right: 2px solid var(--color-accent);
+    border-bottom: 2px solid var(--color-accent);
 }
 
 /* ========================================
@@ -380,8 +400,8 @@ html {
     bottom: -2px;
     left: 0;
     width: 0;
-    height: 1px;
-    background: var(--color-fog);
+    height: 2px;
+    background: var(--color-accent);
     transition: width 0.3s ease;
 }
 
@@ -417,6 +437,12 @@ html {
     50% { transform: translateY(-8px); }
 }
 
+/* Pixel-style blink animation */
+@keyframes pixel-blink {
+    0%, 49% { opacity: 1; }
+    50%, 100% { opacity: 0; }
+}
+
 .animate-slow-spin {
     animation: slow-spin 120s linear infinite;
 }
@@ -429,11 +455,76 @@ html {
     animation: float 6s ease-in-out infinite;
 }
 
+.animate-pixel-blink {
+    animation: pixel-blink 1s steps(1) infinite;
+}
+
 /* Respect reduced motion preferences */
 @media (prefers-reduced-motion: reduce) {
     .animate-slow-spin,
     .animate-pulse-opacity,
-    .animate-float {
+    .animate-float,
+    .animate-pixel-blink {
         animation: none;
     }
+}
+
+/* ========================================
+   TYPOGRAPHY PROSE OVERRIDES
+   ======================================== */
+
+.prose {
+    --tw-prose-body: var(--color-text);
+    --tw-prose-headings: var(--color-darkest);
+    --tw-prose-lead: var(--color-text-muted);
+    --tw-prose-links: var(--color-secondary-accent);
+    --tw-prose-bold: var(--color-darkest);
+    --tw-prose-counters: var(--color-text-muted);
+    --tw-prose-bullets: var(--color-accent);
+    --tw-prose-hr: var(--color-border);
+    --tw-prose-quotes: var(--color-text);
+    --tw-prose-quote-borders: var(--color-accent);
+    --tw-prose-captions: var(--color-text-muted);
+    --tw-prose-code: var(--color-darkest);
+    --tw-prose-pre-code: var(--color-background);
+    --tw-prose-pre-bg: var(--color-darkest);
+    --tw-prose-th-borders: var(--color-border);
+    --tw-prose-td-borders: var(--color-border);
+}
+
+/* Monokai theme for code blocks in posts */
+.prose pre {
+    background: #272822 !important;
+    color: #f8f8f2 !important;
+    border: 1px solid #49483e;
+    border-radius: 0;
+    padding: 1rem;
+    overflow-x: auto;
+}
+
+.prose pre code {
+    background: transparent !important;
+    color: #f8f8f2 !important;
+    padding: 0;
+    font-size: 0.9em;
+    line-height: 1.5;
+    border-radius: 0;
+}
+
+/* Inline code keeps original styling, but code blocks use Monokai */
+.prose :not(pre) > code {
+    background: var(--color-surface);
+    padding: 0.125rem 0.25rem;
+    border-radius: 0;
+    color: var(--color-darkest);
+}
+
+/* Links with underline offset for better readability */
+.prose a {
+    text-decoration-thickness: 1px;
+    text-underline-offset: 3px;
+}
+
+.prose a:hover {
+    color: var(--color-accent);
 }
