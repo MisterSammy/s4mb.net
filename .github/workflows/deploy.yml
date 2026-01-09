@@ -1,0 +1,124 @@
+name: Deploy to Krystal.io
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Node.js dependencies
+        run: npm ci
+
+      - name: Build production assets
+        run: npm run build
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      - name: Add server to known hosts
+        run: |
+          ssh-keyscan -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Sync files to server
+        uses: burnett01/rsync-deployments@7.0.1
+        with:
+          switches: -avzr --delete
+          path: ./
+          remote_path: ${{ secrets.DEPLOY_PATH }}
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_user: ${{ secrets.SSH_USER }}
+          remote_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          remote_port: ${{ secrets.SSH_PORT }}
+          args: >-
+            --exclude='.git/'
+            --exclude='.github/'
+            --exclude='node_modules/'
+            --exclude='vendor/'
+            --exclude='tests/'
+            --exclude='.env'
+            --exclude='.env.*'
+            --exclude='storage/logs/*'
+            --exclude='storage/framework/cache/*'
+            --exclude='storage/framework/sessions/*'
+            --exclude='storage/framework/views/*'
+            --exclude='.phpunit.cache/'
+            --exclude='.phpunit.result.cache'
+            --exclude='.vscode/'
+            --exclude='.idea/'
+            --exclude='.fleet/'
+            --exclude='.nova/'
+            --exclude='.zed/'
+            --exclude='Homestead.json'
+            --exclude='Homestead.yaml'
+            --exclude='Thumbs.db'
+            --exclude='.DS_Store'
+            --exclude='*.log'
+            --exclude='database/database.sqlite'
+            --exclude='public/hot'
+            --exclude='public/storage'
+            --exclude='boost.json'
+
+      - name: Run deployment commands on server
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          port: ${{ secrets.SSH_PORT }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            cd ${{ secrets.DEPLOY_PATH }}
+            
+            # Ensure storage and cache directories are writable
+            chmod -R 775 storage bootstrap/cache || true
+            chown -R ${{ secrets.SSH_USER }}:${{ secrets.SSH_USER }} storage bootstrap/cache || true
+            
+            # Install/update Composer dependencies
+            composer install --no-dev --optimize-autoloader --no-interaction --prefer-dist
+            
+            # Create storage symlink if it doesn't exist
+            if [ ! -L public/storage ]; then
+              php artisan storage:link || true
+            fi
+            
+            # Clear and cache configuration
+            php artisan config:clear || true
+            php artisan config:cache
+            
+            # Clear and cache routes
+            php artisan route:clear || true
+            php artisan route:cache
+            
+            # Clear and cache views
+            php artisan view:clear || true
+            php artisan view:cache
+            
+            # Run database migrations
+            php artisan migrate --force || true
+            
+            # Clear application cache
+            php artisan cache:clear || true
+            
+            # Optimize autoloader
+            composer dump-autoload --optimize --classmap-authoritative --no-interaction
+
+      - name: Deployment complete
+        run: echo "Deployment to Krystal.io completed successfully!"
+

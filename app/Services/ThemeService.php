@@ -2,22 +2,10 @@
 
 namespace App\Services;
 
-use App\Models\Theme;
-use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Session;
 
 class ThemeService
 {
-    /**
-     * Cache key for the active theme.
-     */
-    private const CACHE_KEY = 'active_theme';
-
-    /**
-     * Cache TTL in seconds (1 hour).
-     */
-    private const CACHE_TTL = 3600;
-
     /**
      * Session key for user's theme preference.
      */
@@ -29,10 +17,12 @@ class ThemeService
     private const SESSION_EXPLICIT_KEY = 'theme_preference_explicit';
 
     /**
-     * Get the currently active theme.
-     * Checks session preference first, then system preference, then falls back to globally active theme.
+     * Get the currently active theme data.
+     * Checks session preference first, then system preference, then falls back to default theme.
+     *
+     * @return array<string, mixed>|null
      */
-    public function getActiveTheme(): ?Theme
+    public function getActiveTheme(): ?array
     {
         // Check session for user's explicit theme preference
         $sessionThemeSlug = Session::get(self::SESSION_KEY);
@@ -56,16 +46,36 @@ class ThemeService
             }
         }
 
-        // Fall back to globally active theme
-        return Theme::active();
+        // Fall back to default theme
+        return $this->getDefaultTheme();
     }
 
     /**
      * Get a theme by its slug.
+     *
+     * @return array<string, mixed>|null
      */
-    public function getThemeBySlug(string $slug): ?Theme
+    public function getThemeBySlug(string $slug): ?array
     {
-        return Theme::where('slug', $slug)->first();
+        $themes = config('themes.themes', []);
+
+        if (isset($themes[$slug])) {
+            return array_merge(['slug' => $slug], $themes[$slug]);
+        }
+
+        return null;
+    }
+
+    /**
+     * Get the default theme.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function getDefaultTheme(): ?array
+    {
+        $defaultSlug = config('themes.default', 'pixel-cream');
+
+        return $this->getThemeBySlug($defaultSlug);
     }
 
     /**
@@ -76,7 +86,7 @@ class ThemeService
         $theme = $this->getActiveTheme();
 
         if ($theme) {
-            return $theme->toCssVariables();
+            return $this->themeToCssVariables($theme);
         }
 
         return $this->getDefaultCssVariables();
@@ -87,7 +97,7 @@ class ThemeService
      */
     public function getDefaultCssVariables(): string
     {
-        $colors = Theme::defaultColors();
+        $colors = $this->getDefaultColors();
 
         $css = ':root {';
         $css .= "--color-background: {$colors['background']};";
@@ -104,11 +114,32 @@ class ThemeService
     }
 
     /**
-     * Clear the theme cache.
+     * Convert theme array to CSS variables string.
+     *
+     * @param  array<string, mixed>  $theme
      */
-    public function clearCache(): void
+    private function themeToCssVariables(array $theme): string
     {
-        Cache::forget(self::CACHE_KEY);
+        $colors = $theme['colors'] ?? [];
+
+        $variables = [
+            '--color-background' => $colors['background'] ?? '#fbf5ef',
+            '--color-surface' => $colors['surface'] ?? '#f2d3ab',
+            '--color-accent' => $colors['accent'] ?? '#c69fa5',
+            '--color-secondary-accent' => $colors['secondary_accent'] ?? '#8b6d9c',
+            '--color-text' => $colors['text'] ?? '#494d7e',
+            '--color-text-muted' => $colors['text_muted'] ?? '#6b6f9e',
+            '--color-border' => $colors['border'] ?? '#d4c4b0',
+            '--color-darkest' => $colors['darkest'] ?? '#272744',
+        ];
+
+        $css = ':root {';
+        foreach ($variables as $property => $value) {
+            $css .= "{$property}: {$value};";
+        }
+        $css .= '}';
+
+        return $css;
     }
 
     /**
@@ -121,10 +152,29 @@ class ThemeService
         $theme = $this->getActiveTheme();
 
         if ($theme) {
-            return $theme->colors ?? Theme::defaultColors();
+            return $theme['colors'] ?? $this->getDefaultColors();
         }
 
-        return Theme::defaultColors();
+        return $this->getDefaultColors();
+    }
+
+    /**
+     * Get default color values.
+     *
+     * @return array<string, string>
+     */
+    public function getDefaultColors(): array
+    {
+        return [
+            'background' => '#fbf5ef',
+            'surface' => '#f2d3ab',
+            'accent' => '#c69fa5',
+            'secondary_accent' => '#8b6d9c',
+            'text' => '#494d7e',
+            'text_muted' => '#6b6f9e',
+            'border' => '#d4c4b0',
+            'darkest' => '#272744',
+        ];
     }
 
     /**
@@ -148,7 +198,7 @@ class ThemeService
     }
 
     /**
-     * Get the current theme slug (from session, system preference, or active theme).
+     * Get the current theme slug (from session, system preference, or default theme).
      */
     public function getCurrentThemeSlug(): ?string
     {
@@ -158,7 +208,7 @@ class ThemeService
         if ($sessionThemeSlug && $hasExplicitPreference) {
             $theme = $this->getThemeBySlug($sessionThemeSlug);
             if ($theme) {
-                return $theme->slug;
+                return $theme['slug'];
             }
         }
 
@@ -168,13 +218,13 @@ class ThemeService
             if ($systemPreference) {
                 $theme = $this->getThemeBySlug($systemPreference);
                 if ($theme) {
-                    return $theme->slug;
+                    return $theme['slug'];
                 }
             }
         }
 
-        $activeTheme = Theme::active();
+        $defaultTheme = $this->getDefaultTheme();
 
-        return $activeTheme?->slug;
+        return $defaultTheme['slug'] ?? null;
     }
 }

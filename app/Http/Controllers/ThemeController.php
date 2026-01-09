@@ -17,17 +17,13 @@ class ThemeController extends Controller
      */
     public function switch(Request $request): RedirectResponse
     {
+        $allowedThemes = array_keys(config('themes.themes', []));
+
         $request->validate([
-            'theme' => ['required', 'string'],
+            'theme' => ['required', 'string', 'in:'.implode(',', $allowedThemes)],
         ]);
 
         $themeSlug = $request->input('theme');
-        $theme = $this->themeService->getThemeBySlug($themeSlug);
-
-        if (! $theme) {
-            return redirect()->back()->withErrors(['theme' => 'Theme not found.']);
-        }
-
         $this->themeService->setThemePreference($themeSlug, true);
 
         return redirect()->back();
@@ -38,17 +34,13 @@ class ThemeController extends Controller
      */
     public function setSystemPreference(Request $request): \Illuminate\Http\JsonResponse
     {
+        $allowedThemes = array_keys(config('themes.themes', []));
+
         $request->validate([
-            'theme' => ['required', 'string'],
+            'theme' => ['required', 'string', 'in:'.implode(',', $allowedThemes)],
         ]);
 
         $themeSlug = $request->input('theme');
-        $theme = $this->themeService->getThemeBySlug($themeSlug);
-
-        if (! $theme) {
-            return response()->json(['error' => 'Theme not found.'], 404);
-        }
-
         $this->themeService->setSystemPreference($themeSlug);
 
         return response()->json(['success' => true]);

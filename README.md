@@ -4,3 +4,312 @@
  (_-<_  _/  ' \/ _ \
 /___//_//_/_/_/_.__/
 ```
+
+A Laravel-powered markdown blog. No database, no CMS—just markdown files, a service class, and Blade views.
+
+## Tech Stack
+
+- **Laravel 12** - PHP framework
+- **Tailwind CSS v4** - Styling
+- **Vite** - Asset bundling
+- **highlight.js** - Syntax highlighting
+- **Pest** - Testing framework
+
+## Project Overview
+
+This blog uses a file-based approach where posts are stored as markdown files in `storage/posts/`. Each post includes YAML frontmatter for metadata, and the system automatically parses, renders, and serves them through Laravel routes.
+
+### Architecture
+
+The system has four main components:
+
+1. **Markdown files** in `storage/posts/` with YAML frontmatter
+2. **Post data class** (`App\Data\Post`) that represents a single post
+3. **MarkdownPostService** (`App\Services\MarkdownPostService`) that reads and parses files
+4. **Controllers and views** that render the content
+
+**Flow**: Markdown file → Service parsing → Post data object → Blade rendering → HTML output
+
+### File Structure
+
+```
+app/
+├── Data/
+│   └── Post.php                    # Post data class
+├── Http/
+│   └── Controllers/
+│       ├── HomeController.php      # Lists all posts
+│       └── PostController.php      # Shows single post
+├── Services/
+│   ├── MarkdownPostService.php     # File parsing logic
+│   └── ThemeService.php            # Theme management
+└── View/
+    └── Composers/
+        └── ThemeComposer.php       # Injects theme data
+
+storage/
+└── posts/
+    └── *.md                         # Your blog posts
+
+resources/
+└── views/
+    ├── home.blade.php              # Post listing
+    └── post.blade.php              # Single post view
+```
+
+## Adding New Posts
+
+### File Location
+
+Create a new markdown file in `storage/posts/` directory.
+
+### Naming Convention
+
+**Critical**: The filename determines the URL slug.
+
+- **Format**: `your-slug.md`
+- **Slug rules**: Only lowercase letters, numbers, and hyphens are allowed (`[a-z0-9\-]+`)
+- **Example**: `my-awesome-post.md` → URL: `/posts/my-awesome-post`
+
+**Important**: The slug in the frontmatter (if provided) must match the filename. If no slug is provided in frontmatter, it will be auto-generated from the title, but the filename still determines the URL.
+
+### Frontmatter Format
+
+Each post must start with YAML frontmatter between `---` delimiters:
+
+```markdown
+---
+title: "Your Post Title"
+date: 2025-01-15
+excerpt: "A brief description for the post listing."
+tags: [laravel, php, tutorial]
+slug: your-post-slug
+---
+
+Your markdown content goes here.
+```
+
+**Required fields:**
+- `title` - The post title (required)
+
+**Optional fields:**
+- `date` - Publication date (YYYY-MM-DD). If omitted, uses file modification time
+- `excerpt` - Description for listings. If omitted, auto-generated from content (first 250 chars)
+- `tags` - Array of tags for categorization
+- `slug` - URL identifier. If omitted, auto-generated from title (but filename still determines URL)
+
+### Example Post Template
+
+```markdown
+---
+title: "Getting Started with Laravel"
+date: 2025-01-15
+excerpt: "Learn the basics of Laravel framework"
+tags: [laravel, php, tutorial]
+slug: getting-started-with-laravel
+---
+
+## Introduction
+
+This is your post content. Use standard markdown syntax.
+
+### Code Blocks
+
+```php
+<?php
+
+echo "Hello, World!";
+```
+
+## Conclusion
+
+That's it!
+```
+
+### Slug System Explained
+
+The slug system works as follows:
+
+1. **Filename = URL**: The filename (without `.md`) becomes the URL path
+   - `my-post.md` → `/posts/my-post`
+
+2. **Route constraint**: The route only accepts slugs matching `[a-z0-9\-]+` (lowercase letters, numbers, hyphens)
+   - ✅ Valid: `my-post`, `post-123`, `getting-started`
+   - ❌ Invalid: `My_Post` (uppercase/underscore), `post/123` (slash), `post..md` (dots)
+
+3. **Security**: The service validates the slug format to prevent path traversal attacks
+   - Attempts like `../../../etc/passwd` are blocked
+
+4. **Frontmatter slug**: If you provide a `slug` in frontmatter, it should match the filename for consistency, but the filename is what actually determines the URL.
+
+## Local Development
+
+### Prerequisites
+
+- PHP 8.2+
+- Composer
+- Node.js and npm
+
+### Installation
+
+1. Clone the repository
+2. Install PHP dependencies:
+   ```bash
+   composer install
+   ```
+3. Install Node.js dependencies:
+   ```bash
+   npm install
+   ```
+4. Copy `.env.example` to `.env` and configure:
+   ```bash
+   cp .env.example .env
+   php artisan key:generate
+   ```
+5. Build assets:
+   ```bash
+   npm run build
+   ```
+
+### Running the Development Server
+
+Use the convenience script that runs both PHP server and Vite:
+
+```bash
+composer run dev
+```
+
+Or run separately:
+
+```bash
+# Terminal 1: PHP server
+php artisan serve
+
+# Terminal 2: Vite dev server
+npm run dev
+```
+
+The site will be available at `http://localhost:8000`.
+
+## Theming System
+
+The blog supports two themes:
+
+- **pixel-cream** - Light mode (default)
+- **pixel-dark** - Dark mode
+
+### How Theme Switching Works
+
+1. User preference is stored in the session
+2. System preference (from `prefers-color-scheme`) is detected client-side
+3. Theme CSS variables are injected into every page via a View Composer
+4. Theme switching uses a simple form POST to update the session
+
+Themes are defined in `config/themes.php` and converted to CSS custom properties by `ThemeService`.
+
+## Testing
+
+Run the test suite:
+
+```bash
+php artisan test
+```
+
+Or use the composer script:
+
+```bash
+composer test
+```
+
+Tests cover:
+- Markdown parsing and frontmatter extraction
+- Heading extraction and anchor ID injection
+- Route security and slug validation
+- Post data class functionality
+
+## Deployment
+
+This project uses GitHub Actions to automatically deploy to Krystal.io when changes are pushed to the `main` or `master` branch.
+
+### Prerequisites
+
+1. **Add s4mb.net as an Addon Domain in cPanel**
+   - Log into cPanel and navigate to **Domains** → **Create A New Domain**
+   - Enter `s4mb.net` (without www)
+   - **Untick "Share document root"**
+   - Set Document Root to `s4mb.net` (top-level, not under public_html)
+   - Click Submit
+
+2. **Configure Document Root**
+   - In cPanel, ensure the document root for s4mb.net points to `~/s4mb.net/public`
+   - This is typically done automatically when creating the addon domain
+
+3. **Create `.env` file on server**
+   - SSH into the server: `ssh -p 722 sonarisc@lothal-lon2.krystal.uk`
+   - Navigate to `~/s4mb.net`
+   - Create `.env` file with your production configuration
+   - Ensure database credentials and other environment variables are set
+
+4. **Create storage symlink** (if not done automatically)
+   - On the server, run: `cd ~/s4mb.net && php artisan storage:link`
+
+### GitHub Secrets Configuration
+
+Configure the following secrets in your GitHub repository:
+
+1. Go to your repository on GitHub
+2. Navigate to **Settings** → **Secrets and variables** → **Actions**
+3. Click **New repository secret** and add each of the following:
+
+#### Required Secrets
+
+- **`SSH_HOST`**: `lothal-lon2.krystal.uk`
+- **`SSH_PORT`**: `722`
+- **`SSH_USER`**: `sonarisc`
+- **`SSH_PRIVATE_KEY`**: Your private SSH key content (the entire key, including `-----BEGIN OPENSSH PRIVATE KEY-----` and `-----END OPENSSH PRIVATE KEY-----`)
+- **`DEPLOY_PATH`**: `~/s4mb.net` (or absolute path: `/home/sonarisc/s4mb.net`)
+
+#### Getting Your SSH Private Key
+
+If you don't have a private key pair yet:
+
+1. Generate a new SSH key pair (if needed):
+   ```bash
+   ssh-keygen -t ed25519 -C "github-actions-deploy"
+   ```
+
+2. Add the public key to your Krystal.io cPanel:
+   - Copy the public key from `~/.ssh/id_ed25519.pub`
+   - Add it to cPanel → **Security** → **SSH Access** → **Manage SSH Keys**
+
+3. Use the private key (`~/.ssh/id_ed25519`) content as the `SSH_PRIVATE_KEY` secret
+
+### Deployment Process
+
+The GitHub Actions workflow will:
+
+1. **Build Phase**: Install Node.js dependencies and build production assets with Vite
+2. **Sync Phase**: Use rsync to sync files to the server (excluding development files)
+3. **Server Setup Phase**:
+   - Set proper permissions for `storage/` and `bootstrap/cache/`
+   - Run `composer install --no-dev --optimize-autoloader`
+   - Create storage symlink if needed
+   - Clear and cache Laravel configuration, routes, and views
+   - Run database migrations
+   - Clear application cache
+
+### Manual Deployment Trigger
+
+You can manually trigger a deployment by:
+
+1. Going to your repository on GitHub
+2. Clicking on **Actions** tab
+3. Selecting **Deploy to Krystal.io** workflow
+4. Clicking **Run workflow** button
+
+### Troubleshooting
+
+- **Permission errors**: Ensure the SSH user has write access to `~/s4mb.net` and its subdirectories
+- **Storage symlink issues**: Manually run `php artisan storage:link` on the server
+- **Database connection errors**: Verify `.env` file on server has correct database credentials
+- **Asset loading issues**: Ensure `public/build` directory is synced and has correct permissions

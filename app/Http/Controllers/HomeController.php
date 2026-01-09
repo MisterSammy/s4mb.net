@@ -2,14 +2,17 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Post;
-use Illuminate\Http\Request;
+use App\Services\MarkdownPostService;
 
 class HomeController extends Controller
 {
+    public function __construct(
+        protected MarkdownPostService $postService
+    ) {}
+
     public function index()
     {
-        $posts = Post::latest()->get();
+        $posts = $this->postService->getAllPosts();
 
         return view('home', [
             'posts' => $posts,
