@@ -76,6 +76,25 @@
                     </div>
                     <div class="dashed-circle w-8 h-8"></div>
                 </div>
+
+                {{-- Professional Experience --}}
+                <div class="mt-8 space-y-4">
+                    <div class="font-mono text-sm text-[var(--color-text-muted)]">
+                        <span class="font-bold">1996</span> <span class="mx-2">·</span> <span>💾</span> built an RPG in BASIC on the Amstrad CPC 464
+                    </div>
+                    <div class="font-mono text-sm text-[var(--color-text-muted)]">
+                        <span class="font-bold">2017</span> <span class="mx-2">·</span> <span>📦</span> <a href="https://www.huboo.com" target="_blank" rel="noopener" class="text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors">New Vision</a> — modernized legacy PHP systems and architected real-time API middleware for e-commerce platforms
+                    </div>
+                    <div class="font-mono text-sm text-[var(--color-text-muted)]">
+                        <span class="font-bold">2020</span> <span class="mx-2">·</span> <span>🎓</span> <a href="https://www.worktribe.com" target="_blank" rel="noopener" class="text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors">WorkTribe</a> — built cross-platform React Native apps with Laravel backends for university research management
+                    </div>
+                    <div class="font-mono text-sm text-[var(--color-text-muted)]">
+                        <span class="font-bold">2021</span> <span class="mx-2">·</span> <span>⚖️</span> Stephenson Law — built and led dev team from scratch, architected mission-critical legal compliance platforms and customer portals
+                    </div>
+                    <div class="font-mono text-sm text-[var(--color-text-muted)]">
+                        <span class="font-bold">2024</span> <span class="mx-2">·</span> <span>📺</span> <a href="https://www.simplestream.com" target="_blank" rel="noopener" class="text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors">SimpleStream</a> — scalable video streaming APIs powering platforms for Sony, News UK, and PBS America
+                    </div>
+                </div>
             </div>
         </div>
     </section>
