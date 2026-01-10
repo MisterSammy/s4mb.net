@@ -10,6 +10,7 @@ import css from 'highlight.js/lib/languages/css';
 import bash from 'highlight.js/lib/languages/bash';
 import markdown from 'highlight.js/lib/languages/markdown';
 import diff from 'highlight.js/lib/languages/diff';
+import typescript from 'highlight.js/lib/languages/typescript';
 
 hljs.registerLanguage('php', php);
 hljs.registerLanguage('javascript', javascript);
@@ -19,6 +20,7 @@ hljs.registerLanguage('css', css);
 hljs.registerLanguage('bash', bash);
 hljs.registerLanguage('markdown', markdown);
 hljs.registerLanguage('diff', diff);
+hljs.registerLanguage('typescript', typescript);
 
 // Highlight code blocks only within .prose containers (blog post content)
 // This excludes decorative code blocks like ASCII art on the homepage
