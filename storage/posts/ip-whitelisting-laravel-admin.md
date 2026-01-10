@@ -37,10 +37,10 @@ return [
 
     // IPs that are allowed (when whitelist mode is enabled)
     'whitelist' => [
-        '192.0.2.10',        // Office IP
-        '198.51.100.25',     // CEO home
-        '203.0.113.50',      // VPN exit
-        '192.0.2.100',       // Remote employee
+        '<office-ip>',           // Office IP
+        '<ceo-home-ip>',         // CEO home
+        '<vpn-exit-ip>',         // VPN exit
+        '<remote-employee-ip>',  // Remote employee
     ],
 
     'responses' => [
@@ -165,8 +165,8 @@ For small teams, editing the config file works. For larger organizations, consid
 Then manage IPs via Artisan:
 
 ```bash
-php artisan firewall:whitelist 192.0.2.100
-php artisan firewall:remove 192.0.2.100
+php artisan firewall:whitelist <remote-employee-ip>
+php artisan firewall:remove <remote-employee-ip>
 php artisan firewall:list
 ```
 
@@ -186,8 +186,8 @@ Allow entire subnets with CIDR notation:
 
 ```php
 'whitelist' => [
-    '192.0.2.0/24',        // Office network (docs example range)
-    '10.0.0.0/8',          // Internal private network
+    '<office-network>/24',  // Office network
+    '10.0.0.0/8',           // Internal private network
 ],
 ```
 
