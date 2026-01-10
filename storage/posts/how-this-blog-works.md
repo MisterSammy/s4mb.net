@@ -10,7 +10,7 @@ If you're a Laravel developer looking to start a blog, you've probably considere
 
 But here's the thing: you already know Laravel. You know Blade templating, you know how services work, you understand the request lifecycle. Why learn an entirely new toolchain when you can build something elegant with the framework you use every day?
 
-This blog is built with Laravel. No database for posts, no admin panel, no CMS. Just markdown files, a service class, and Blade views. This post explains how it works and why this approach might be right for your next project.
+This blog is built with Laravel using a **file-based approach**—a departure from the typical database-driven Laravel application. Each blog post is stored as a markdown file in `storage/posts/`, where the filename (e.g., `my-post.md`) becomes the URL slug (`/posts/my-post`). No database for posts, no admin panel, no CMS. Just markdown files, a service class, and Blade views. This post explains how it works and why this approach might be right for your next project.
 
 Here's the file structure we'll be working with:
 
@@ -89,7 +89,7 @@ The frontmatter provides metadata:
 - `tags` — An array of tags for categorization
 - `slug` — URL identifier, also used as the filename
 
-The slug determines both the URL (`/posts/your-post-slug`) and the filename (`your-post-slug.md`). This convention keeps the system simple—finding a post by slug is just a file lookup.
+The slug determines both the URL (`/posts/your-post-slug`) and the filename (`your-post-slug.md`). This convention keeps the system simple—finding a post by slug is just a file lookup. All posts are stored in `storage/posts/`, making it easy to version control your content and keep everything in one place.
 
 ## The Post Data Class
 
@@ -665,106 +665,85 @@ Theme preference is stored in the session. When a user toggles the theme, a simp
 
 With a static site generator, this kind of dynamic theming would require client-side JavaScript to swap stylesheets or CSS classes. The Laravel approach handles it server-side with a form submission.
 
-## Custom Error Pages
-
-Laravel makes it easy to customize error pages—just create Blade templates in `resources/views/errors/` named after the HTTP status code. A `404.blade.php` handles "not found" errors, `500.blade.php` handles server errors, and so on.
-
-But if you're using a dynamic theming system, you'll want error pages to respect the user's theme preference too. The challenge is that error pages are standalone—they don't automatically receive the variables your other views get.
-
-### Registering the Theme Composer for Error Views
-
-The solution is to register your View Composer for error pages. In `AppServiceProvider`:
-
-```php
-public function boot(): void
-{
-    View::composer(['home', 'post', 'errors.*'], ThemeComposer::class);
-}
-```
-
-The `errors.*` wildcard ensures all error pages receive the theme CSS variables.
-
-### Creating a Shared Error Layout
-
-Rather than duplicating the same HTML structure across five or more error pages, create a base layout that child views extend. This follows Laravel's template inheritance pattern and keeps error pages maintainable.
-
-The layout at `resources/views/errors/layout.blade.php` includes all the shared elements:
-
-```blade
-<!DOCTYPE html>
-<html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
-    <head>
-        <title>@yield('title') — {{ config('app.name') }}</title>
-        @vite(['resources/css/app.css', 'resources/js/app.js'])
-        @if(isset($themeCss))
-        <style>{!! $themeCss !!}</style>
-        @endif
-    </head>
-    <body class="bg-[var(--color-background)] text-[var(--color-text)]">
-        {{-- Shared header, decorations, footer --}}
-        
-        <h1>@yield('code')</h1>
-        <p>@yield('message')</p>
-        
-        @yield('action')
-    </body>
-</html>
-```
-
-Individual error pages become minimal—they just extend the layout and fill in the sections:
-
-```blade
-@extends('errors.layout', ['dots' => 4])
-
-@section('title', 'Page Not Found')
-@section('code', '404')
-@section('message', 'This page has wandered off somewhere')
-
-@section('action')
-    <a href="{{ url('/') }}">Back to Home</a>
-@endsection
-```
-
-Each error page is now around 30 lines instead of 170. When you need to update the header, footer, or styling, you change it once in the layout.
-
-### What Each Error Page Needs
-
-The common error pages and their purposes:
-
-- **403** — Forbidden. User is authenticated but not authorized.
-- **404** — Not Found. The requested resource doesn't exist.
-- **419** — Page Expired. The CSRF token has expired (common after leaving a form open).
-- **500** — Server Error. Something broke on your end.
-- **503** — Service Unavailable. Shown during maintenance mode.
-
-The 419 page is particularly useful for CSRF token expiration. Instead of a confusing error, you can show a friendly message with a "Refresh Page" button.
-
-The 503 page is special—it's shown when you run `php artisan down`. Unlike other error pages, you might want to hide navigation links since the rest of the site is unavailable. The layout can handle this with conditional sections:
-
-```blade
-@section('show_home_link', false)
-
-@section('footer')
-    {{-- Minimal footer without navigation --}}
-@endsection
-```
-
-### Fallback Error Pages
-
-Laravel also supports fallback templates. A `4xx.blade.php` handles any 4xx error that doesn't have its own template, and `5xx.blade.php` does the same for server errors. This is useful if you want consistent styling for uncommon status codes like 402 or 422 without creating individual templates for each.
-
-Note that fallbacks don't affect 404, 500, or 503—Laravel always looks for specific templates for these common cases.
-
 ## Routing
 
 The routes are straightforward:
 
 ```php
 Route::get('/', [HomeController::class, 'index']);
-Route::get('/posts/{slug}', [PostController::class, 'show'])->name('posts.show');
+Route::get('/posts/{slug}', [PostController::class, 'show'])
+    ->name('posts.show')
+    ->where('slug', '[a-z0-9\-_]+');  // Security: constrain slug format
 ```
 
-The `{slug}` parameter maps directly to the filename, keeping the mental model simple.
+This is a **file-based routing system**—unlike typical Laravel applications that use Eloquent models and database queries, this blog stores posts as markdown files in `storage/posts/`. When a request comes in for `/posts/my-post`, Laravel extracts the `slug` parameter (`my-post`), and the controller looks up `storage/posts/my-post.md` directly.
+
+### Why `storage/posts/`?
+
+Posts are stored in `storage/posts/` for a few practical reasons:
+
+- **Outside the web root.** Files in `storage/` aren't directly accessible via HTTP, providing a security layer. Even if your web server configuration fails, users can't browse your post files directly.
+- **Version controlled.** You can commit your markdown files to git alongside your application code. Every post edit becomes a commit with a diff, making content changes easy to track and review.
+- **Simple deployment.** When you deploy, your posts deploy with your code. No separate database migrations or content sync process.
+
+### File-to-URL Mapping
+
+The slug-to-filename convention (`/posts/my-post` → `storage/posts/my-post.md`) creates a one-to-one mapping that makes the system predictable:
+
+```php
+// URL: /posts/building-state-machines-without-a-library
+// File: storage/posts/building-state-machines-without-a-library.md
+```
+
+When the `PostController::show()` method receives a slug, it doesn't need to query a database or scan a directory. It constructs the file path directly: `$filePath = $postsPath.'/'.$slug.'.md'`. This is an O(1) operation—constant time regardless of how many posts you have. Contrast this with a database-driven approach where you'd need a `SELECT` query, even with an index.
+
+### A Departure from Typical Laravel Patterns
+
+Most Laravel applications follow this pattern for content:
+
+```php
+// Typical Laravel approach
+Route::get('/posts/{post}', [PostController::class, 'show']);
+
+class PostController
+{
+    public function show(Post $post)  // Route model binding
+    {
+        return view('post', ['post' => $post]);
+    }
+}
+```
+
+The `Post` model extends `Illuminate\Database\Eloquent\Model`, queries a `posts` table in the database, and provides relationships, scopes, and all the power of Eloquent.
+
+This blog takes a different approach:
+
+```php
+// File-based approach
+Route::get('/posts/{slug}', [PostController::class, 'show']);
+
+class PostController
+{
+    public function show(string $slug)  // Simple string parameter
+    {
+        $post = $this->postService->findBySlug($slug);  // File lookup
+        // ...
+    }
+}
+```
+
+The `Post` class is a plain data object, not an Eloquent model. There's no database table, no migrations, no relationships. Posts are files, and routing is file-based.
+
+### Why This Works Well
+
+This file-based approach works particularly well for developer blogs because:
+
+- **Developer-friendly workflow.** You write posts in your favorite editor, commit them to git, and they're live. No need to log into an admin panel or deal with WYSIWYG editors.
+- **Fast lookup.** Finding a post is a single file system operation. No database round-trip, no query parsing, no result hydration.
+- **Simple deployment.** Your content is code. When you deploy, your posts deploy. No separate content management or sync process.
+- **Git-native.** Your posts have full version history, can be reviewed in pull requests, and can be reverted with `git revert`. You get all the benefits of version control for your content.
+
+The trade-off is that you lose the flexibility of database relationships. If you need categories, tags, related posts, or complex filtering, a database becomes more practical. But for a personal blog with straightforward content, the file-based approach keeps things simple and maintainable.
 
 ## When This Approach Works Well
 
