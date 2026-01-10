@@ -1,7 +1,7 @@
 ---
 title: "A State Machine Without a State Machine Library"
 date: 2025-01-09
-excerpt: "PHP 8.1 enums with transition methods give you a production-ready state machine pattern. Type-safe, testable, and dependency-free - perfect for Laravel applications."
+excerpt: "For simple workflows, PHP enums with transition methods are all you need. But for complex state machines with many states and guards, consider a dedicated package."
 tags: [laravel, php, architecture, enums, workflow]
 slug: a-state-machine-without-a-state-machine-library
 ---
@@ -10,19 +10,25 @@ State machines are everywhere in business applications. Orders move from pending
 
 The instinct when facing these requirements is to reach for a state machine package. Laravel has several good ones - `spatie/laravel-model-states`, `asantibanez/laravel-eloquent-state-machines`, and others. They're well-designed and battle-tested.
 
-But PHP 8.1 gave us backed enums, and with them, a powerful built-in pattern for state machines. Why add a dependency when the language gives you the tools? This post shows you how to build production-ready state machines with PHP enums - a pattern that scales from straightforward workflows to complex business processes with dozens of states.
+But sometimes a package is overkill. If your workflow is **truly simple** - 3-5 states, linear progression, predictable transitions - you can build something elegant with just PHP 8.1 enums. This post shows you when that makes sense, and when to reach for a package instead.
 
-## Example: Food Truck Festival Vendor Applications
+## The Simple Case: Food Truck Festival Vendor Applications
 
-Consider a food truck festival where vendors submit applications that move through an approval process:
+Consider a food truck festival where vendors submit applications that move through a straightforward approval process:
 
 1. **Application Submitted**  -  Vendor applied to participate
 2. **Health Inspection**  -  Health department reviews permits
-3. **Insurance Review**  -  Festival organizers verify insurance
+3. **Insurance Review** .  Festival organizers verify insurance
 4. **Approved**  -  Ready to participate
 5. **Rejected**  -  Application denied (from any stage)
 
-This is a real-world workflow, and the enum-based approach handles it elegantly. The same pattern scales to more complex domains with many states - the principles remain the same.
+This workflow has a few key properties that make it a good candidate for a simple enum-based approach:
+- Small number of states (5 total)
+- Mostly linear progression
+- Predictable transitions
+- No complex guards or async checks
+
+For this use case, an enum with transition validation is sufficient:
 
 ## Defining States with Enums
 
@@ -120,7 +126,7 @@ if ($vendor->status === VendorStatus::APPROVED) {
 
 ## Transition Validation
 
-The key to a robust state machine is preventing invalid transitions. Add transition validation directly to the enum:
+The key to a simple state machine is preventing invalid transitions. Add transition validation directly to the enum:
 
 ```php
 enum VendorStatus: int
@@ -284,42 +290,65 @@ public function submitHealthInspection(): void
 
 The state machine logic lives right where the action happens. When an inspection completes, the system immediately determines the next state based on the outcome.
 
-## Why This Pattern Works
+## When This Simple Pattern Works Well
 
-The enum-based approach gives you several powerful advantages:
+This enum-based approach works well when:
 
-**Type safety at the language level.** The `status` property can only be one of the defined enum cases. No typos, no invalid states - the compiler enforces correctness. Your IDE autocompletes states, and static analysis tools catch invalid transitions before runtime.
+**States are few (3-8).** Beyond that, the `match` statements become unwieldy.
 
-**Zero dependencies.** You're using native PHP 8.1+ features. No package updates to manage, no breaking changes from external maintainers, no conflicts with other dependencies. The pattern is part of your codebase.
+**Transitions are predictable.** The workflow follows a mostly linear path with some branches.
 
-**Testability.** Enums are simple PHP classes. Testing transition logic is straightforward - you're testing pure functions, not complex package abstractions. Each `canTransitionTo()` call is easily unit tested.
+**No complex guards.** Transitions don't depend on multiple conditions, async checks, or external service calls.
 
-**Maintainability.** All state logic lives in one place. When you need to add a new state or transition, you modify the enum. Refactoring is simple - find all usages of the enum, update the transition logic, and you're done. The pattern scales naturally - as your workflow grows to 20, 50, or even 100 states, you're still working with the same enum pattern.
+**No transition history needed.** You don't need to audit who changed states when (though you can still log this separately).
 
-**Performance.** No overhead from package abstractions. Enum comparisons are fast integer comparisons. No serialization layers, no complex state objects - just enum cases backed by integers in your database.
+**Minimal dependencies.** You want to avoid external packages for simple workflows.
 
-**Flexibility.** Need guards? Add them as methods on the enum. Need permission checks? Add them as methods. Need state-specific behavior? Match on the enum. The pattern doesn't box you in - it gives you a solid foundation to build on.
+## When to Reach for a Package
 
-For larger enums, organize related transitions with helper methods, extract shared logic into traits, or split into separate enums per bounded context. The pattern scales with your domain.
+Now consider a more complex workflow - a vendor application system for a large multi-day festival:
 
-## When Packages Offer Specific Features
+- **10+ states:** Application → Initial Review → Background Check → Health Permit → Insurance → Fire Safety → Capacity Review → Payment → Final Approval → Active → Suspended → Rejected (from multiple stages)
+- **Role-based transitions:** Only festival coordinators can approve, but vendors can submit documents
+- **Time-based guards:** Applications auto-reject if not completed within 30 days
+- **Transition history:** Need to audit all state changes for compliance
+- **Side effects:** State changes trigger webhooks, notifications, and external API calls
 
-The enum approach handles state machines of any size. However, dedicated packages like `spatie/laravel-model-states` or `asantibanez/laravel-eloquent-state-machines` offer specific features you might need:
+For this complexity, a dedicated state machine package like `spatie/laravel-model-states` is the right choice:
 
-- **Automatic transition history** - Built-in audit logging of state changes with timestamps and user tracking
-- **Guard classes** - Structured guard objects for complex validation logic
-- **Event hooks** - Automatic event dispatching on state transitions
-- **Visualization tools** - Generated diagrams of your state machine
-- **Testing utilities** - Helper methods for testing state transitions
+```php
+use Spatie\ModelStates\State;
+use Spatie\ModelStates\StateConfig;
 
-If you need these features, a package makes sense. But many applications don't. You can add transition history with a separate `state_transitions` table and observers. You can dispatch events manually in your controllers or services. You can test enum methods directly with Pest or PHPUnit.
+abstract class VendorApplicationState extends State
+{
+    public static function config(): StateConfig
+    {
+        return parent::config()
+            ->default(ApplicationSubmitted::class)
+            ->allowTransition(ApplicationSubmitted::class, HealthInspection::class)
+            ->allowTransition(HealthInspection::class, InsuranceReview::class, [
+                HealthInspectionPassedGuard::class,
+            ])
+            ->allowTransition(InsuranceReview::class, Approved::class, [
+                InsuranceVerifiedGuard::class,
+                PaymentCompletedGuard::class,
+            ]);
+    }
+}
+```
 
-The decision should be feature-driven, not state-count-driven. An enum with 50 states is perfectly manageable. If you need automatic audit logging or complex guard abstractions, consider a package. Otherwise, enums give you everything you need.
+Packages provide:
+- **Transition history** with automatic audit logging
+- **Guard classes** for complex validation logic
+- **Event hooks** for side effects (notifications, webhooks)
+- **Better tooling** for debugging and visualization
+- **Documentation** and established patterns
 
 ## Conclusion
 
-PHP enums with transition validation are a production-ready pattern for state machines in Laravel. They provide type safety, IDE support, testability, and enforce valid transitions - all without external dependencies. The pattern scales naturally from straightforward workflows to complex business processes with dozens or even hundreds of states.
+For truly simple workflows with 3-8 states and predictable transitions, PHP enums with transition validation are elegant and sufficient. They provide type safety, IDE support, and enforce valid transitions - all without external dependencies.
 
-Make enums your default choice. They're maintainable, performant, and flexible. When you need specific package features like automatic transition history or complex guard abstractions, evaluate packages on those merits. But don't assume you'll outgrow enums as your state machine grows - the pattern scales with your domain.
+But as complexity grows - more states, complex guards, transition history, multiple roles - a dedicated state machine package becomes the pragmatic choice. The enum approach works until it doesn't, and you'll know when you've outgrown it.
 
-The best state machine is the one that solves your problem with the least complexity. For most Laravel applications, that's PHP enums.
+Start simple. If your workflow stays simple, the enum approach will serve you well. If it grows complex, you'll appreciate having a battle-tested package to handle the edge cases.
