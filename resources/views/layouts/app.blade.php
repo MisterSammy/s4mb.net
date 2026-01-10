@@ -64,14 +64,6 @@
                             <a href="{{ url('/') }}#posts" class="font-mono text-sm text-[var(--color-text-muted)] transition-colors hover-line">
                                 Posts
                             </a>
-                            <span class="text-[var(--color-border)]" aria-hidden="true">—</span>
-                            <a href="#" class="font-mono text-sm text-[var(--color-text-muted)] transition-colors hover-line" aria-disabled="true">
-                                Elsewhere
-                            </a>
-                            <div class="corner-brackets ml-2" aria-hidden="true">
-                                <span class="text-xs text-[var(--color-text-muted)] font-mono">↗</span>
-                            </div>
-                            <span class="text-[var(--color-border)]" aria-hidden="true">—</span>
                             {{-- Theme Switcher --}}
                             <form action="{{ route('theme.switch') }}" method="POST" class="inline">
                                 @csrf
@@ -108,11 +100,11 @@
                 <div class="max-w-5xl mx-auto px-6 lg:px-8 relative z-10">
                     <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                         <div class="flex items-center gap-6">
-                            <a href="#" class="font-mono text-xs text-[var(--color-text-muted)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2" aria-disabled="true">GitHub</a>
+                            <a href="https://github.com/MisterSammy" target="_blank" rel="noopener" class="font-mono text-xs text-[var(--color-text-muted)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2">GitHub</a>
                             <span class="w-1 h-1 bg-[var(--color-border)]" aria-hidden="true"></span>
-                            <a href="#" class="font-mono text-xs text-[var(--color-text-muted)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2" aria-disabled="true">Twitter</a>
+                            <a href="https://x.com/MisterSammyB" target="_blank" rel="noopener" class="font-mono text-xs text-[var(--color-text-muted)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2">Twitter</a>
                             <span class="w-1 h-1 bg-[var(--color-border)]" aria-hidden="true"></span>
-                            <a href="#" class="font-mono text-xs text-[var(--color-text-muted)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2" aria-disabled="true">LinkedIn</a>
+                            <a href="https://www.linkedin.com/in/samlouisbrown/" target="_blank" rel="noopener" class="font-mono text-xs text-[var(--color-text-muted)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2">LinkedIn</a>
                         </div>
                         
                         <div class="flex items-center gap-4">

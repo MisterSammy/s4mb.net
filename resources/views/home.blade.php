@@ -82,6 +82,10 @@
                     <div class="font-mono text-sm text-[var(--color-text-muted)]">
                         <span class="font-bold">1996</span> <span class="mx-2">·</span> <span>💾</span> built an RPG in BASIC on the Amstrad CPC 464
                     </div>
+                    <!-- <div class="font-mono text-sm text-[var(--color-text-muted)]">
+                        <span class="font-bold">1999</span> <span class="mx-2">·</span> <span>🎮</span> Played a lot of AoE on Win98 and N64 and got internet. Then life happened
+                    </div> -->
+
                     <div class="font-mono text-sm text-[var(--color-text-muted)]">
                         <span class="font-bold">2017</span> <span class="mx-2">·</span> <span>📦</span> <a href="https://www.huboo.com" target="_blank" rel="noopener" class="text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors">New Vision</a> — modernized legacy PHP systems and architected real-time API middleware for e-commerce platforms
                     </div>
@@ -93,6 +97,9 @@
                     </div>
                     <div class="font-mono text-sm text-[var(--color-text-muted)]">
                         <span class="font-bold">2024</span> <span class="mx-2">·</span> <span>📺</span> <a href="https://www.simplestream.com" target="_blank" rel="noopener" class="text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors">SimpleStream</a> — scalable video streaming APIs powering platforms for Sony, News UK, and PBS America
+                    </div>
+                    <div class="font-mono text-sm text-[var(--color-text-muted)]">
+                        <span class="font-bold">2026</span> <span class="mx-2">·</span> <span>✨</span> I'm building online tools for creatives, and the things I always wanted
                     </div>
                 </div>
             </div>

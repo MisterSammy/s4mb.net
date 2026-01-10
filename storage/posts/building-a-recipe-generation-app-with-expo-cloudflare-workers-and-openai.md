@@ -1,9 +1,9 @@
 ---
-title: "Building a Recipe Generation App with Expo, Cloudflare Workers, and OpenAI"
+title: "A Recipe Generation App with Expo, Cloudflare Workers, and OpenAI"
 date: 2026-01-09
 excerpt: "A technical walkthrough of building a React Native recipe app with Expo, Cloudflare Workers for the backend, and OpenAI GPT-4o for recipe generation. Covers architecture decisions, rate limiting with KV storage, schema migrations in SQLite, and prompt engineering."
 tags: [react-native, expo, cloudflare-workers, openai, typescript, sqlite, architecture]
-slug: building-a-recipe-generation-app-with-expo-cloudflare-workers-and-openai
+slug: a-recipe-generation-app-with-expo-cloudflare-workers-and-openai
 ---
 
 I built a recipe generation app over the past few weeks, and I wanted to share what I learned about the architecture and some of the interesting technical challenges I ran into. The app is straightforward in concept: you tell it what ingredients you have in your kitchen, specify any dietary preferences or time constraints, and it generates recipes you can actually make. But as with most seemingly simple projects, the devil's in the details.
