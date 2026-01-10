@@ -12,9 +12,48 @@ But the default setup assumes everyone on a team is roughly equivalent—maybe s
 
 Consider a coworking space management platform where each location is a "team," but that team includes both staff (who manage the space) and members (who book rooms and desks). Same team, very different permission needs.
 
-This post walks through adapting Jetstream's permission system for this hybrid model—using a **single, consistent permission system** rather than mixing approaches.
+This post walks through adapting Jetstream's permission system for this hybrid model—using a **two-layer approach**: boolean flags for user type and Jetstream roles for team-scoped permissions.
 
 ## The Challenge
+
+Picture a coworking company with three locations: Downtown, Westside, and Midtown. Each location has its own staff—space managers who handle day-to-day operations—and members who pay for desk space and meeting rooms.
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│                        COWORKING COMPANY                            │
+├─────────────────────┬─────────────────────┬─────────────────────────┤
+│      DOWNTOWN       │      WESTSIDE       │        MIDTOWN          │
+│    (Jetstream Team) │   (Jetstream Team)  │    (Jetstream Team)     │
+├─────────────────────┼─────────────────────┼─────────────────────────┤
+│ Staff:              │ Staff:              │ Staff:                  │
+│  • Sarah (Manager)  │  • Mike (Manager)   │  • Lisa (Manager)       │
+│  • Tom (Front Desk) │                     │  • James (Front Desk)   │
+├─────────────────────┼─────────────────────┼─────────────────────────┤
+│ Members:            │ Members:            │ Members:                │
+│  • Alice            │  • Bob              │  • Carol                │
+│  • Dan              │  • Eve              │  • Frank                │
+│  • Grace            │                     │  • Henry                │
+└─────────────────────┴─────────────────────┴─────────────────────────┘
+```
+
+Here's where it gets interesting. **Staff and members both need to access the same location data**—but with completely different capabilities:
+
+**What staff need to do:**
+- View and manage ALL bookings at their location
+- Check members in and out
+- Configure room availability and pricing
+- Handle billing and generate reports
+- Manage member accounts
+
+**What members need to do:**
+- Book rooms and desks for themselves
+- View and cancel their OWN bookings
+- Update their profile and billing info
+- See what rooms are available
+
+The permission problem becomes clear: **members should never see other members' bookings, but staff need to see everyone's**. Members can cancel their own reservations, but staff can cancel anyone's. Both populations interact with the same data (bookings, rooms, the location itself) but through very different lenses.
+
+### Why Jetstream Alone Falls Short
 
 In a typical Jetstream setup, you define roles with permissions:
 
@@ -23,31 +62,40 @@ Jetstream::role('admin', 'Administrator', ['*'])->description('Full access');
 Jetstream::role('editor', 'Editor', ['read', 'create', 'update'])->description('Can edit content');
 ```
 
-These roles exist within the context of a team. A user might be an admin on Team A and an editor on Team B.
+These roles exist within the context of a team. A user might be an admin on Team A and an editor on Team B. But the implicit assumption is that all team members are fundamentally the same type of user—internal collaborators with varying levels of access.
 
-But what if you have two fundamentally different user populations?
+Our coworking scenario breaks this assumption. Staff and members aren't just users with different permission levels—they're **fundamentally different user populations** who happen to share a team context:
 
-1. **Space managers** — Staff who manage bookings, handle check-ins, and configure rooms
-2. **Members** — Coworking members who book rooms, view their reservations, and update their profiles
+- Staff might work at multiple locations (Sarah (staff) could be the manager at both Downtown and Westside)
+- Members belong to one location and shouldn't even know other members exist
+- Staff need access to admin panels, reports, and management tools that members should never see
+- The UI, navigation, and entire experience differs by user type
 
-Staff need granular permissions for all the management functions. Members need a simpler set focused on their own bookings. And they're both members of the same team (the coworking location).
+You can't solve this with Jetstream roles alone because the distinction between "staff" and "member" is **global to the user**, not scoped to a team. Sarah (staff) is staff everywhere she goes. Alice (member) is a member everywhere she goes. The question isn't "what role does this user have on this team?"—it's "what kind of user is this, and what can they do here?"
 
-## The Single Source of Truth Principle
+## The Two-Layer Approach
 
-A common mistake is creating **two parallel permission systems**—boolean flags on the User model (`isStaff`, `isAdmin`) plus Jetstream roles. This leads to confusion:
+When you have fundamentally different user populations (staff vs members), you need two layers of authorization:
+
+1. **User Type (Global)** — Boolean flags on the User model to distinguish user populations
+2. **Team Permissions (Scoped)** — Jetstream roles define what users can do within a specific team
+
+The key insight: **User TYPE is global, but PERMISSIONS are team-scoped**.
 
 ```php
-// ❌ DON'T DO THIS - Two competing systems
-protected $fillable = ['isStaff', 'isAdmin', 'isFinance'];  // Flags
+// User model - distinguishes user populations globally
+protected $fillable = ['name', 'email', 'password', 'isStaff'];
 
-// Plus Jetstream roles
-Jetstream::role('manager', 'Manager', ['bookings:*']);
-
-// Now you have to check both everywhere
-if ($user->isStaff && $user->hasPermission('bookings:create')) { ... }
+// isStaff = true → Space managers (internal users who can work across locations)
+// isStaff = false → Members (coworking clients who belong to one location)
 ```
 
-Instead, **use Jetstream roles as your single source of truth**. If you need additional capabilities, add them as permissions within the role system.
+The `isStaff` flag answers: "What kind of user is this?" (global question)  
+Jetstream roles answer: "What can this user do in THIS team?" (team-scoped question)
+
+This isn't two competing systems—they solve different problems:
+- **Boolean flags**: User belongs to a fundamentally different population
+- **Jetstream roles**: Permissions within a specific team/location context
 
 ## Defining Roles for Different User Types
 
@@ -117,25 +165,37 @@ protected function configurePermissions(): void
 
 Notice the permission naming convention: `resource:action`. This makes permissions scannable and predictable. The `-own` suffix indicates actions limited to the user's own resources.
 
-## Checking Permissions
+## Setting Up the User Model
 
-Jetstream provides `hasTeamPermission()` to check if a user has a permission on a specific team. Create a convenient wrapper:
+Your User model needs the `isStaff` flag to distinguish user populations, and a simple helper for checking permissions:
 
 ```php
-// In your User model
+// app/Models/User.php
+protected $fillable = [
+    'name',
+    'email',
+    'password',
+    'isStaff', // Distinguishes staff from members
+];
+
+/**
+ * Check if the user has a permission on their current team
+ */
 public function hasPermission(string $ability): bool
 {
-    $team = $this->currentTeam;
-    
-    if (!$team) {
+    if (!$this->currentTeam) {
         return false;
     }
     
-    return $this->hasTeamPermission($team, $ability);
+    return $this->hasTeamPermission($this->currentTeam, $ability);
 }
 ```
 
-Now controllers can check permissions cleanly:
+This keeps permission checking simple throughout your application—no need to pass the team every time.
+
+## Checking Permissions
+
+With the `hasPermission()` helper on your User model, checking permissions is straightforward:
 
 ```php
 public function store(Request $request)
@@ -148,117 +208,166 @@ public function store(Request $request)
 }
 ```
 
-## Handling "Own" vs "All" Permissions
-
-Some permissions need context—members can read their own bookings, but managers can read all bookings. Handle this with a helper method:
+For model-specific authorization (like checking ownership), use Policies. Policies can still use `hasPermission()` to check Jetstream team permissions:
 
 ```php
-// In your User model
-public function canAccessBooking(Booking $booking): bool
+// app/Policies/BookingPolicy.php
+public function create(User $user): bool
 {
-    // Can read all bookings
-    if ($this->hasPermission('bookings:read')) {
-        return true;
-    }
-    
-    // Can only read own bookings
-    if ($this->hasPermission('bookings:read-own') && $booking->user_id === $this->id) {
-        return true;
-    }
-    
-    return false;
-}
-
-public function canCancelBooking(Booking $booking): bool
-{
-    // Can cancel any booking
-    if ($this->hasPermission('bookings:delete')) {
-        return true;
-    }
-    
-    // Can only cancel own bookings
-    if ($this->hasPermission('bookings:cancel-own') && $booking->user_id === $this->id) {
-        return true;
-    }
-    
-    return false;
+    return $user->hasPermission('bookings:create');
 }
 ```
 
-Or use a policy:
+## Using Gates for User Type Checks
+
+While `isStaff` is a simple boolean check, you can create Gates for cleaner, reusable user-type checks:
 
 ```php
+// In app/Providers/AuthServiceProvider.php
+use Illuminate\Support\Facades\Gate;
+
+public function boot(): void
+{
+    Gate::define('beStaff', function (User $user) {
+        return $user->isStaff;
+    });
+
+    Gate::define('beMember', function (User $user) {
+        return !$user->isStaff;
+    });
+}
+```
+
+Now you can use these in Blade templates or controllers:
+
+```blade
+@can('beStaff')
+    {{-- Staff-only content --}}
+    <a href="{{ route('admin.dashboard') }}">Admin Dashboard</a>
+@endcan
+
+@can('beMember')
+    {{-- Member-only content --}}
+    <a href="{{ route('bookings.index') }}">My Bookings</a>
+@endcan
+```
+
+Or in controllers:
+
+```php
+if (Gate::allows('beStaff')) {
+    // Staff-only logic
+}
+```
+
+## Handling "Own" vs "All" Permissions
+
+This is where the core permission challenge gets solved. Remember: Alice (a member) should only see her own bookings at Downtown, while Sarah (staff) needs to see all bookings at that location.
+
+Use Laravel Policies for model-specific authorization:
+
+```php
+// app/Policies/BookingPolicy.php
 class BookingPolicy
 {
     public function view(User $user, Booking $booking): bool
     {
-        return $user->hasPermission('bookings:read') 
-            || ($user->hasPermission('bookings:read-own') && $booking->user_id === $user->id);
+        // Can read all bookings
+        if ($user->hasPermission('bookings:read')) {
+            return true;
+        }
+        
+        // Can only read own bookings
+        return $user->hasPermission('bookings:read-own') && $booking->user_id === $user->id;
     }
 
     public function delete(User $user, Booking $booking): bool
     {
-        return $user->hasPermission('bookings:delete')
-            || ($user->hasPermission('bookings:cancel-own') && $booking->user_id === $user->id);
+        // Can cancel any booking
+        if ($user->hasPermission('bookings:delete')) {
+            return true;
+        }
+        
+        // Can only cancel own bookings
+        return $user->hasPermission('bookings:cancel-own') && $booking->user_id === $user->id;
     }
+}
+```
+
+With this policy:
+- When Alice (member) visits `/bookings/123`, the policy checks if she has `bookings:read` (no) or `bookings:read-own` AND owns the booking (yes, if it's hers)
+- When Sarah (staff) visits the same URL, the policy checks if she has `bookings:read` (yes) and grants access immediately
+
+Register the policy in your `AuthServiceProvider`:
+
+```php
+// In app/Providers/AuthServiceProvider.php
+use App\Models\Booking;
+use App\Policies\BookingPolicy;
+
+protected $policies = [
+    Booking::class => BookingPolicy::class,
+];
+```
+
+Now use the policy in controllers:
+
+```php
+public function show(Booking $booking)
+{
+    $this->authorize('view', $booking);
+    
+    return view('bookings.show', compact('booking'));
+}
+
+public function destroy(Booking $booking)
+{
+    $this->authorize('delete', $booking);
+    
+    $booking->delete();
+    
+    return redirect()->route('bookings.index');
 }
 ```
 
 ## Role-Based UI Variations
 
-Sometimes you need different UI for different roles. Use role checks for this:
+Staff and members need completely different experiences. When Sarah (staff) logs into the Downtown location, she sees a management dashboard with all bookings, check-in tools, and reports. When Alice (member) logs in, she sees a simple booking interface focused on available rooms and her own reservations.
 
-```php
-// In your User model - use the relationship, not raw queries
-public function teamRole(): ?string
-{
-    $membership = $this->currentTeam?->users()
-        ->where('user_id', $this->id)
-        ->first();
-    
-    return $membership?->pivot->role;
-}
-
-public function isSpaceManager(): bool
-{
-    return in_array($this->teamRole(), ['space_manager', 'location_admin']);
-}
-```
-
-In Blade:
+Use the `isStaff` flag or Gates for user-type checks:
 
 ```blade
-@if(auth()->user()->isSpaceManager())
+@can('beStaff')
+    {{-- Sarah (staff) sees: management dashboard with all bookings, check-in tools, reports --}}
+    <x-manager-dashboard :location="$location" />
+@else
+    {{-- Alice (member) sees: booking interface with available rooms and her reservations --}}
+    <x-member-dashboard :bookings="$userBookings" />
+@endcan
+```
+
+Or check permissions directly:
+
+```blade
+@if(auth()->user()->hasPermission('admin:access'))
     {{-- Staff dashboard with management tools --}}
     <x-manager-dashboard :location="$location" />
 @else
     {{-- Member dashboard with booking interface --}}
-    <x-member-dashboard :bookings="$bookings" />
+    <x-member-dashboard :bookings="$userBookings" />
 @endif
 ```
 
+Prefer permission-based checks over role-based checks for better flexibility. Permission checks are more granular and easier to modify without changing role definitions.
+
 ## Conditional UI Based on Permissions
 
-For granular UI control, check specific permissions:
+Staff like Sarah (staff) and Tom (staff) need check-in buttons, report links, and admin tools. Members like Alice (member) should never see these controls—not just be denied access, but not even know they exist.
 
-```blade
-@can('bookings:check-in')
-    <button wire:click="checkIn({{ $booking->id }})">
-        Check In
-    </button>
-@endcan
-
-@can('reports:view')
-    <a href="{{ route('reports.index') }}">
-        View Reports
-    </a>
-@endcan
-```
-
-Register permissions with Laravel's Gate:
+For granular UI control, you can register specific Gates or check permissions directly:
 
 ```php
-// In AuthServiceProvider
+// In app/Providers/AuthServiceProvider.php
 public function boot(): void
 {
     Gate::define('bookings:check-in', function (User $user) {
@@ -268,25 +377,40 @@ public function boot(): void
     Gate::define('reports:view', function (User $user) {
         return $user->hasPermission('reports:view');
     });
-}
-```
 
-Or register them dynamically:
-
-```php
-// In AuthServiceProvider
-public function boot(): void
-{
-    Gate::before(function (User $user, string $ability) {
-        // Check Jetstream team permissions for any ability
-        if ($user->currentTeam && $user->hasTeamPermission($user->currentTeam, $ability)) {
-            return true;
-        }
-        
-        return null; // Fall through to other gates
+    Gate::define('admin:access', function (User $user) {
+        return $user->hasPermission('admin:access');
     });
 }
 ```
+
+Then use them in Blade:
+
+```blade
+{{-- Only Tom (staff) and Sarah (staff) see check-in buttons; Alice (member) never sees this --}}
+@can('bookings:check-in')
+    <button wire:click="checkIn({{ $booking->id }})">
+        Check In
+    </button>
+@endcan
+
+{{-- Staff-only: occupancy reports, revenue, etc. --}}
+@can('reports:view')
+    <a href="{{ route('reports.index') }}">
+        View Reports
+    </a>
+@endcan
+
+{{-- Management dashboard access --}}
+@can('admin:access')
+    <a href="{{ route('admin.dashboard') }}">
+        Admin Dashboard
+    </a>
+@endcan
+```
+
+Alice's (member) view of the booking list shows only her bookings with a "Cancel" button. Sarah's (staff) view shows all bookings with "Check In", "Check Out", "Edit", and "Cancel" buttons. The same Blade component can serve both, with permissions controlling what renders.
+
 
 ## Admin Panel Access
 
@@ -325,9 +449,27 @@ class EnsureUserHasAdminAccess
 }
 ```
 
+Or use Laravel's built-in `Gate` middleware after registering the Gate:
+
+```php
+// In your Filament AdminPanelProvider
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->authGuard('web')
+        ->login()
+        ->authMiddleware([
+            Authenticate::class,
+        ])
+        ->middleware([
+            \Illuminate\Auth\Middleware\Authorize::class . ':admin:access',
+        ]);
+}
+```
+
 ## Switching Between Locations
 
-Staff members might work at multiple locations. Jetstream handles team switching natively:
+Remember Sarah (staff) from the challenge? She's a manager at Downtown but might also help out at Westside. Staff members often work at multiple locations, and Jetstream handles team switching natively:
 
 ```php
 public function switchToLocation(int $teamId): RedirectResponse
@@ -361,6 +503,8 @@ public function switchLocation(int $teamId): void
     $this->redirect(route('dashboard'));
 }
 ```
+
+When Sarah (staff) switches from Downtown to Westside, her `currentTeam` changes, and all permission checks now evaluate against the Westside team. Her `isStaff` flag remains true—she's still staff—but her team-scoped permissions are now checked against her role at Westside.
 
 ## Extending Permission Checks with Wildcards
 
@@ -400,15 +544,66 @@ Jetstream::role('booking_manager', 'Booking Manager', [
 ])->description('Can manage all bookings but not rooms.');
 ```
 
+## Going Further with Bouncer
+
+The hybrid approach with boolean flags, Gates, and Policies works great, but as your permission system grows more complex—especially if you need dynamic permissions or complex hierarchies—you might benefit from a dedicated package like [Bouncer](https://github.com/JosephSilber/bouncer).
+
+Bouncer provides:
+- **Database-stored permissions** — Define permissions dynamically without hardcoding in `JetstreamServiceProvider`
+- **Ability inheritance** — Permissions cascade through role hierarchies
+- **Cleaner API** — More expressive syntax for complex permission scenarios
+- **Caching** — Built-in performance optimizations for permission checks
+
+### Using Bouncer with Jetstream Teams
+
+Bouncer can work alongside Jetstream teams. You'd use Bouncer for the permission logic while keeping Jetstream for team membership:
+
+```php
+use Silber\Bouncer\BouncerFacade as Bouncer;
+
+// Define abilities
+Bouncer::allow('space_manager')->to('manage', Booking::class);
+Bouncer::allow('space_manager')->to('create', Room::class);
+Bouncer::allow('member')->to('view', Booking::class);
+Bouncer::allow('member')->toOwn(Booking::class)->to('delete'); // Own bookings only
+
+// Assign roles scoped to a team
+$user->assign('space_manager')->to($team);
+
+// Check permissions
+$user->can('manage', $booking); // true for space_manager on that team
+$user->can('delete', $booking); // true only if it's their own booking
+
+// Use in policies
+class BookingPolicy
+{
+    public function delete(User $user, Booking $booking): bool
+    {
+        return $user->can('delete', $booking); // Bouncer handles the logic
+    }
+}
+```
+
+### When to Use Bouncer
+
+Consider Bouncer if you need:
+- **Dynamic permissions** — Permissions assigned at runtime, not just in code
+- **Complex hierarchies** — Roles that inherit from other roles
+- **Fine-grained ownership rules** — "own" permissions handled automatically
+- **Multi-tenant permissions** — Different permission sets per team/location
+
+For simpler applications, Gates and Policies with Jetstream's built-in permissions are usually sufficient and keep your dependencies minimal.
+
 ## Summary
 
 Jetstream's team and role system is flexible enough to handle mixed user populations. The key principles:
 
-1. **Use a single permission system** — Don't mix boolean flags with roles
-2. **Define clear roles** for each user type with appropriate permissions
-3. **Use the `resource:action` naming convention** for scannable permissions
-4. **Handle "own" vs "all"** with `-own` suffixed permissions and policies
-5. **Check permissions via policies and gates** for consistent authorization
-6. **Extend wildcards** if you need pattern matching
+1. **Use a two-layer approach** — Boolean flags (`isStaff`) distinguish user populations globally, while Jetstream roles handle team-scoped permissions
+2. **Define clear roles** for each user type with appropriate permissions using the `resource:action` naming convention
+3. **Add a simple `hasPermission()` helper** on the User model to make permission checking convenient throughout your application
+4. **Use Gates for user-type checks** — Create Gates like `beStaff` for reusable user-type authorization
+5. **Use Policies for model-specific authorization** — Handle "own" vs "all" permissions in dedicated policy classes that call `hasPermission()`
+6. **Prefer permission checks over role checks** — Permission-based checks are more granular and flexible than hardcoded role names
+7. **Consider Bouncer for advanced scenarios** — If you need dynamic permissions, complex hierarchies, or database-driven permissions, Bouncer provides a powerful alternative
 
-The result is a system where staff and members coexist on the same team, each seeing the interface and capabilities appropriate to their role—all managed through a single, consistent permission system.
+The result is a system where staff and members coexist on the same team, each seeing the interface and capabilities appropriate to their role. User type is handled globally via boolean flags, while permissions remain team-scoped through Jetstream roles—giving you the best of both worlds.
