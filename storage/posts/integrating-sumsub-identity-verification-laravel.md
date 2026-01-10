@@ -6,13 +6,13 @@ tags: [laravel, integration, kyc, verification, api]
 slug: integrating-sumsub-identity-verification-laravel
 ---
 
-If you're building software for regulated industries—finance, healthcare, property management, marketplace platforms—you'll eventually need to verify that users are who they claim to be. Know Your Customer (KYC) requirements aren't optional. They're often the law.
+If you're building software for regulated industries - finance, healthcare, property management, marketplace platforms. You'll eventually need to verify that users are who they claim to be. Know Your Customer (KYC) requirements aren't optional. They're often the law.
 
 You have two options: build verification infrastructure yourself (document scanning, liveness detection, database checks against sanctions lists) or integrate a third-party service that specializes in this.
 
 Unless identity verification is your core business, the second option wins. Services like SumSub, Onfido, and Jumio have teams dedicated to staying ahead of fraud techniques and regulatory changes. Your job is to integrate their SDK and handle the results.
 
-This post walks through integrating SumSub into a Laravel application. The concepts apply to similar services—they all follow the same general pattern of SDK embedding, webhook handling, and status management.
+This post walks through integrating SumSub into a Laravel application. The concepts apply to similar services - they all follow the same general pattern of SDK embedding, webhook handling, and status management.
 
 ## The Integration Architecture
 
@@ -84,7 +84,7 @@ private function createSignature(int $ts, string $httpMethod, string $url, strin
 }
 ```
 
-The signature proves that the request came from someone who knows your secret key and hasn't been tampered with in transit. The timestamp prevents replay attacks—old signatures become invalid.
+The signature proves that the request came from someone who knows your secret key and hasn't been tampered with in transit. The timestamp prevents replay attacks - old signatures become invalid.
 
 Here's how to send an authenticated request:
 
@@ -151,7 +151,7 @@ public function createApplicant(string $externalUserId, string $levelName): stri
 }
 ```
 
-The `levelName` refers to a verification flow you configure in SumSub's dashboard. Different levels can require different documents—ID only, ID plus proof of address, ID plus selfie, etc.
+The `levelName` refers to a verification flow you configure in SumSub's dashboard. Different levels can require different documents - ID only, ID plus proof of address, ID plus selfie, etc.
 
 ## Generating Access Tokens
 
@@ -177,7 +177,7 @@ These tokens expire after a short period (typically 10-30 minutes). The SDK hand
 
 ## Embedding the WebSDK
 
-Now for the frontend. SumSub provides a JavaScript SDK that handles the entire verification UI—document upload, camera access, liveness detection, and progress feedback:
+Now for the frontend. SumSub provides a JavaScript SDK that handles the entire verification UI - document upload, camera access, liveness detection, and progress feedback:
 
 ```blade
 <x-app-layout>
@@ -189,7 +189,7 @@ Now for the frontend. SumSub provides a JavaScript SDK that handles the entire v
         
         <p class="mb-4">
             We're required to verify that you are who you say you are. 
-            This is quick and easy—just follow the steps below.
+            This is quick and easy - just follow the steps below.
         </p>
         
         <ol class="list-decimal ml-6 mb-6 space-y-2">
@@ -363,7 +363,7 @@ Route::post('/webhooks/sumsub', [VerificationController::class, 'handleWebhook']
 
 ## External User Verification
 
-Not all users have accounts in your system. Sometimes you need to verify someone who isn't registered—a company officer, a beneficial owner, someone named in documents.
+Not all users have accounts in your system. Sometimes you need to verify someone who isn't registered - a company officer, a beneficial owner, someone named in documents.
 
 Create a verification flow that works without authentication:
 
@@ -473,8 +473,8 @@ Reference them in config:
 
 ## Conclusion
 
-Integrating identity verification isn't conceptually difficult—it's just fiddly. You're coordinating between your backend, a JavaScript SDK, and asynchronous webhooks. The pieces are simple; the complexity is in handling all the edge cases.
+Integrating identity verification isn't conceptually difficult - it's just fiddly. You're coordinating between your backend, a JavaScript SDK, and asynchronous webhooks. The pieces are simple; the complexity is in handling all the edge cases.
 
 Start with the happy path: token generation, SDK embedding, and basic webhook handling. Then layer in error handling, retry logic, and status messaging. Before you know it, you'll have a robust verification flow that satisfies regulators and provides a smooth user experience.
 
-The same patterns apply to other verification services. The API details differ, but the architecture—tokens, SDKs, webhooks—remains consistent. Once you've integrated one, you can integrate them all.
+The same patterns apply to other verification services. The API details differ, but the architecture - tokens, SDKs, webhooks - remains consistent. Once you've integrated one, you can integrate them all.

@@ -10,7 +10,7 @@ If you're a Laravel developer who's ever wanted to build a real-time multiplayer
 
 But here's the thing: Laravel Reverb changes that equation. Combined with Phaser.js on the frontend, you can build a fully functional real-time multiplayer 2D game using the framework you already know. No new backend language required.
 
-This post walks through how I built a multiplayer game where authenticated users move around a shared world, seeing each other's positions update in real-time. The key insight—and what makes this feel magical—is understanding how a logged-in Laravel user maps to a character on a Phaser canvas.
+This post walks through how I built a multiplayer game where authenticated users move around a shared world, seeing each other's positions update in real-time. The key insight - and what makes this feel magical - is understanding how a logged-in Laravel user maps to a character on a Phaser canvas.
 
 Here's the architecture we're working with:
 
@@ -74,7 +74,7 @@ Now the game scene knows *who* is playing. This user ID becomes the key that con
 
 ### Step 2: Presence Channels
 
-Laravel's presence channels are designed for exactly this use case—tracking who's connected to a shared space. The channel authorization returns user data that other clients can see:
+Laravel's presence channels are designed for exactly this use case - tracking who's connected to a shared space. The channel authorization returns user data that other clients can see:
 
 ```php
 // routes/channels.php
@@ -110,7 +110,7 @@ window.Echo.join('game')
     });
 ```
 
-The presence channel handles the hard part—tracking who's online—automatically. You don't need to maintain a list of connected users or handle disconnection cleanup. Laravel does it for you.
+The presence channel handles the hard part. Tracking who's online - automatically. You don't need to maintain a list of connected users or handle disconnection cleanup. Laravel does it for you.
 
 ### Step 3: Position Events
 
@@ -260,7 +260,7 @@ Here's how a single movement propagates through the system:
 └─────────────────────────────────────────────────────────────────────┘
 ```
 
-The round trip happens in milliseconds. Player A presses W, their position updates locally, the server broadcasts, and Player B sees them move—all while both players remain authenticated Laravel users.
+The round trip happens in milliseconds. Player A presses W, their position updates locally, the server broadcasts, and Player B sees them move - all while both players remain authenticated Laravel users.
 
 ## Setting Up Laravel Reverb
 
@@ -312,7 +312,7 @@ if (reverbKey) {
 }
 ```
 
-Yes, you read that right—the frontend uses `pusher-js` even though Reverb isn't Pusher. Reverb implements the Pusher protocol, so the existing Pusher JavaScript library works out of the box. This is a deliberate design choice that lets you use battle-tested client libraries.
+Yes, you read that right - the frontend uses `pusher-js` even though Reverb isn't Pusher. Reverb implements the Pusher protocol, so the existing Pusher JavaScript library works out of the box. This is a deliberate design choice that lets you use battle-tested client libraries.
 
 **Environment variables:**
 
@@ -388,7 +388,7 @@ class CharacterScene extends Phaser.Scene {
 }
 ```
 
-The game renders characters as ASCII text—`@` for the local player, letters like `T`, `R`, `F` for others. This gives it a retro terminal aesthetic, but the same architecture works for sprite-based games.
+The game renders characters as ASCII text;`@` for the local player, letters like `T`, `R`, `F` for others. This gives it a retro terminal aesthetic, but the same architecture works for sprite-based games.
 
 ## Key Design Decisions
 
@@ -442,7 +442,7 @@ This creates the illusion of smooth movement even though we only receive 10 posi
 
 ### Why Presence Channels?
 
-Presence channels provide automatic user tracking. When a player's browser closes or their connection drops, Laravel automatically fires the `leaving` callback for all other clients. You don't need to implement heartbeats, timeouts, or cleanup logic—it's handled at the framework level.
+Presence channels provide automatic user tracking. When a player's browser closes or their connection drops, Laravel automatically fires the `leaving` callback for all other clients. You don't need to implement heartbeats, timeouts, or cleanup logic - it's handled at the framework level.
 
 The alternative would be managing a list of connected users yourself, implementing keep-alive pings, and handling edge cases like network interruptions. Presence channels abstract all of that away.
 

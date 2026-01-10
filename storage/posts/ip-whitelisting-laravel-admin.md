@@ -6,7 +6,7 @@ tags: [laravel, security, admin, firewall]
 slug: ip-whitelisting-laravel-admin
 ---
 
-Your admin panel is the keys to the kingdom. User management, data exports, configuration changes—everything sensitive lives there. Even with strong authentication, exposing it to the entire internet is unnecessary risk.
+Your admin panel is the keys to the kingdom. User management, data exports, configuration changes - everything sensitive lives there. Even with strong authentication, exposing it to the entire internet is unnecessary risk.
 
 IP whitelisting adds a layer of defense. Only requests from known IP addresses reach your admin routes. Everyone else gets a 403 before they can even attempt a login.
 
@@ -280,6 +280,6 @@ No single measure is bulletproof. Layers of defense mean attackers must bypass m
 
 IP whitelisting dramatically reduces your admin panel's attack surface. Instead of defending against the entire internet, you're defending against known, trusted networks.
 
-The `pragmarx/firewall` package makes implementation straightforward—configure your IPs, apply the middleware, and unauthorized requests never reach your application code.
+The `pragmarx/firewall` package makes implementation straightforward - configure your IPs, apply the middleware, and unauthorized requests never reach your application code.
 
 For internal tools and admin panels, it's one of the simplest security wins available.

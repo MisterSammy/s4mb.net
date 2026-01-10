@@ -8,19 +8,19 @@ slug: building-state-machines-without-a-library
 
 State machines are everywhere in business applications. Orders move from pending to paid to shipped to delivered. Support tickets escalate from open to in-progress to resolved. Vendor applications progress through approval stages before becoming active.
 
-The instinct when facing these requirements is to reach for a state machine package. Laravel has several good ones—`spatie/laravel-model-states`, `asantibanez/laravel-eloquent-state-machines`, and others. They're well-designed and battle-tested.
+The instinct when facing these requirements is to reach for a state machine package. Laravel has several good ones - `spatie/laravel-model-states`, `asantibanez/laravel-eloquent-state-machines`, and others. They're well-designed and battle-tested.
 
-But sometimes a package is overkill. If your workflow is **truly simple**—3-5 states, linear progression, predictable transitions—you can build something elegant with just PHP 8.1 enums. This post shows you when that makes sense, and when to reach for a package instead.
+But sometimes a package is overkill. If your workflow is **truly simple** - 3-5 states, linear progression, predictable transitions - you can build something elegant with just PHP 8.1 enums. This post shows you when that makes sense, and when to reach for a package instead.
 
 ## The Simple Case: Food Truck Festival Vendor Applications
 
 Consider a food truck festival where vendors submit applications that move through a straightforward approval process:
 
-1. **Application Submitted** — Vendor applied to participate
-2. **Health Inspection** — Health department reviews permits
-3. **Insurance Review** — Festival organizers verify insurance
-4. **Approved** — Ready to participate
-5. **Rejected** — Application denied (from any stage)
+1. **Application Submitted**  -  Vendor applied to participate
+2. **Health Inspection**  -  Health department reviews permits
+3. **Insurance Review** .  Festival organizers verify insurance
+4. **Approved**  -  Ready to participate
+5. **Rejected**  -  Application denied (from any stage)
 
 This workflow has a few key properties that make it a good candidate for a simple enum-based approach:
 - Small number of states (5 total)
@@ -306,7 +306,7 @@ This enum-based approach works well when:
 
 ## When to Reach for a Package
 
-Now consider a more complex workflow—a vendor application system for a large multi-day festival:
+Now consider a more complex workflow - a vendor application system for a large multi-day festival:
 
 - **10+ states:** Application → Initial Review → Background Check → Health Permit → Insurance → Fire Safety → Capacity Review → Payment → Final Approval → Active → Suspended → Rejected (from multiple stages)
 - **Role-based transitions:** Only festival coordinators can approve, but vendors can submit documents
@@ -347,8 +347,8 @@ Packages provide:
 
 ## Conclusion
 
-For truly simple workflows with 3-8 states and predictable transitions, PHP enums with transition validation are elegant and sufficient. They provide type safety, IDE support, and enforce valid transitions—all without external dependencies.
+For truly simple workflows with 3-8 states and predictable transitions, PHP enums with transition validation are elegant and sufficient. They provide type safety, IDE support, and enforce valid transitions - all without external dependencies.
 
-But as complexity grows—more states, complex guards, transition history, multiple roles—a dedicated state machine package becomes the pragmatic choice. The enum approach works until it doesn't, and you'll know when you've outgrown it.
+But as complexity grows - more states, complex guards, transition history, multiple roles - a dedicated state machine package becomes the pragmatic choice. The enum approach works until it doesn't, and you'll know when you've outgrown it.
 
 Start simple. If your workflow stays simple, the enum approach will serve you well. If it grows complex, you'll appreciate having a battle-tested package to handle the edge cases.

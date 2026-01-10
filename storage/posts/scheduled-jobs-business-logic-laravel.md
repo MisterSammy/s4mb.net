@@ -169,7 +169,7 @@ class SendRentalReminders extends Command
 }
 ```
 
-The `reminder_sent_at` column ensures idempotency—even if the job runs multiple times on the same day, each rental only gets one reminder.
+The `reminder_sent_at` column ensures idempotency - even if the job runs multiple times on the same day, each rental only gets one reminder.
 
 ## Scheduling the Commands
 
@@ -374,6 +374,6 @@ Scheduled jobs turn time-based business rules into code. Instead of relying on u
 
 The pattern is straightforward: use dedicated timestamp columns to track when business events occur, then query for items that meet your time-based criteria. This approach is robust, scalable, and makes your business logic explicit.
 
-Start with your most important time-based rules—expiration, reminders, cleanup—and add more as needed. Laravel's scheduler makes it easy to define when jobs run, and Artisan commands make them testable and debuggable.
+Start with your most important time-based rules - expiration, reminders, cleanup - and add more as needed. Laravel's scheduler makes it easy to define when jobs run, and Artisan commands make them testable and debuggable.
 
 Your users will appreciate the proactive communication, and your business rules will be enforced consistently, 24/7.

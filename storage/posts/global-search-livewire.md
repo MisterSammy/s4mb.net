@@ -6,11 +6,11 @@ tags: [laravel, livewire, search, components]
 slug: global-search-livewire
 ---
 
-Sometimes you just need search to work. Not "proper" search with fancy indexing and typo tolerance—just a text box that finds stuff. You've got a deadline, a demo tomorrow, or a client who swears they'll "add real search later."
+Sometimes you just need search to work. Not "proper" search with fancy indexing and typo tolerance - just a text box that finds stuff. You've got a deadline, a demo tomorrow, or a client who swears they'll "add real search later."
 
 This is that search. Quick, dirty, and MySQL-powered. Copy it, ship it, move on with your life.
 
-> **For production apps:** This MySQL approach works for small datasets. For anything serious, use [Typesense](https://typesense.org/)—it's open-source, blazing fast, typo-tolerant, and integrates with Laravel Scout in minutes.
+> **For production apps:** This MySQL approach works for small datasets. For anything serious, use [Typesense](https://typesense.org/). It's open-source, blazing fast, typo-tolerant, and integrates with Laravel Scout in minutes.
 
 ## The Component
 

@@ -10,15 +10,15 @@ Every application eventually needs a notes feature. Properties need notes. Tenan
 
 Don't do that.
 
-Laravel's polymorphic relationships let you create one `notes` table that can attach to any model. One migration, one model class, one set of queries to maintain. When you add a new noteable model next month, you just add a relationship—no schema changes.
+Laravel's polymorphic relationships let you create one `notes` table that can attach to any model. One migration, one model class, one set of queries to maintain. When you add a new noteable model next month, you just add a relationship - no schema changes.
 
 ## The Scenario: Property Management
 
 A property management company tracks various entities:
-- **Properties** — Buildings and units under management
-- **Tenants** — Current and past occupants
-- **Work Orders** — Maintenance requests and repairs
-- **Leases** — Active rental agreements
+- **Properties**  -  Buildings and units under management
+- **Tenants**  -  Current and past occupants
+- **Work Orders**  -  Maintenance requests and repairs
+- **Leases**  -  Active rental agreements
 
 Staff need to add notes to all of these. A polymorphic notes system lets them do that with one unified feature.
 
@@ -42,8 +42,8 @@ Schema::create('notes', function (Blueprint $table) {
 ```
 
 The `morphs()` helper creates:
-- `noteable_type` — The class name of the parent model (`App\Models\Property`)
-- `noteable_id` — The ID of the specific record
+- `noteable_type` .  The class name of the parent model (`App\Models\Property`)
+- `noteable_id`  -  The ID of the specific record
 
 Together they form a "pointer" to any model in your system.
 
@@ -190,7 +190,7 @@ Note::create([
 ]);
 ```
 
-The relationship approach is cleaner—you don't need to specify the type and ID manually.
+The relationship approach is cleaner - you don't need to specify the type and ID manually.
 
 ## Querying Notes
 

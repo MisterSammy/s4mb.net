@@ -6,11 +6,11 @@ tags: [laravel, markdown, architecture, php, tutorial]
 slug: how-this-blog-works
 ---
 
-If you're a Laravel developer looking to start a blog, you've probably considered the usual suspects: Jekyll, Hugo, Gatsby, Astro, or one of the many JavaScript-based static site generators. They're popular for good reason—they're fast, they handle markdown well, and they have large ecosystems.
+If you're a Laravel developer looking to start a blog, you've probably considered the usual suspects: Jekyll, Hugo, Gatsby, Astro, or one of the many JavaScript-based static site generators. They're popular for good reason - they're fast, they handle markdown well, and they have large ecosystems.
 
 But here's the thing: you already know Laravel. You know Blade templating, you know how services work, you understand the request lifecycle. Why learn an entirely new toolchain when you can build something elegant with the framework you use every day?
 
-This blog is built with Laravel using a **file-based approach**—a departure from the typical database-driven Laravel application. Each blog post is stored as a markdown file in `storage/posts/`, where the filename (e.g., `my-post.md`) becomes the URL slug (`/posts/my-post`). No database for posts, no admin panel, no CMS. Just markdown files, a service class, and Blade views. This post explains how it works and why this approach might be right for your next project.
+This blog is built with Laravel using a **file-based approach** - a departure from the typical database-driven Laravel application. Each blog post is stored as a markdown file in `storage/posts/`, where the filename (e.g., `my-post.md`) becomes the URL slug (`/posts/my-post`). No database for posts, no admin panel, no CMS. Just markdown files, a service class, and Blade views. This post explains how it works and why this approach might be right for your next project.
 
 Here's the file structure we'll be working with:
 
@@ -45,7 +45,7 @@ Before diving into the implementation, here are a few concepts that might be unf
 
 Static site generators are purpose-built for content sites, so why use a full web framework? A few reasons:
 
-**Familiar tooling.** If Laravel is your daily driver, you can spin up a blog in an afternoon without consulting documentation for a new framework. Blade, Tailwind, Vite, Artisan—it's all there.
+**Familiar tooling.** If Laravel is your daily driver, you can spin up a blog in an afternoon without consulting documentation for a new framework. Blade, Tailwind, Vite, Artisan - it's all there.
 
 **Deployment simplicity.** If you're already deploying Laravel applications, your blog can use the same infrastructure. No separate build pipeline, no Node.js runtime on the server, no static file hosting configuration.
 
@@ -83,13 +83,13 @@ Your markdown content goes here.
 ```
 
 The frontmatter provides metadata:
-- `title` — The post title (required)
-- `date` — Publication date, or defaults to file modification time
-- `excerpt` — Description for listings, or auto-generated from content
-- `tags` — An array of tags for categorization
-- `slug` — URL identifier, also used as the filename
+- `title`  -  The post title (required)
+- `date`  -  Publication date, or defaults to file modification time
+- `excerpt`  -  Description for listings, or auto-generated from content
+- `tags`  -  An array of tags for categorization
+- `slug`  -  URL identifier, also used as the filename
 
-The slug determines both the URL (`/posts/your-post-slug`) and the filename (`your-post-slug.md`). This convention keeps the system simple—finding a post by slug is just a file lookup. All posts are stored in `storage/posts/`, making it easy to version control your content and keep everything in one place.
+The slug determines both the URL (`/posts/your-post-slug`) and the filename (`your-post-slug.md`). This convention keeps the system simple - finding a post by slug is just a file lookup. All posts are stored in `storage/posts/`, making it easy to version control your content and keep everything in one place.
 
 ## The Post Data Class
 
@@ -139,7 +139,7 @@ class Post
 }
 ```
 
-This is intentionally not an Eloquent model. There's no database table, no relationships, no query scopes. It's a plain PHP object that holds data. The `getDisplayExcerpt()` method provides a fallback when no excerpt is defined in the frontmatter—it strips markdown formatting and returns the first 250 characters.
+This is intentionally not an Eloquent model. There's no database table, no relationships, no query scopes. It's a plain PHP object that holds data. The `getDisplayExcerpt()` method provides a fallback when no excerpt is defined in the frontmatter - it strips markdown formatting and returns the first 250 characters.
 
 Using a dedicated data class rather than an associative array gives you IDE autocompletion, type safety, and a clear contract for what a post contains.
 
@@ -172,7 +172,7 @@ public function getAllPosts(): Collection
 }
 ```
 
-The method uses `File::glob()` to find all markdown files, maps each through the parser, filters out any that failed to parse, and sorts by date. The `filter()` call removes null values—posts that had invalid frontmatter or missing required fields.
+The method uses `File::glob()` to find all markdown files, maps each through the parser, filters out any that failed to parse, and sorts by date. The `filter()` call removes null values - posts that had invalid frontmatter or missing required fields.
 
 For a blog with dozens of posts, this approach is performant. File reads are fast, and the operating system caches frequently accessed files. If you're concerned about performance with hundreds of posts, you could add Laravel's cache layer:
 
@@ -220,7 +220,7 @@ Route::get('/posts/{slug}', [PostController::class, 'show'])
     ->where('slug', '[a-z0-9\-]+');
 ```
 
-This blocks invalid slugs at the routing layer before they reach the controller, returning a 404 immediately. Both layers together provide robust protection—the route constraint handles the common case efficiently, while the service validation protects against direct service usage or future code paths that might bypass routing.
+This blocks invalid slugs at the routing layer before they reach the controller, returning a 404 immediately. Both layers together provide robust protection - the route constraint handles the common case efficiently, while the service validation protects against direct service usage or future code paths that might bypass routing.
 
 ### Parsing Frontmatter
 
@@ -289,7 +289,7 @@ private function parseSimpleYaml(string $yaml): array
 }
 ```
 
-This parser handles key-value pairs, quoted strings, and inline arrays—everything needed for post metadata. It deliberately doesn't support nested structures or multi-line values. If you need full YAML support, you could use the `symfony/yaml` package instead, but for frontmatter, this lightweight approach works well and avoids an additional dependency.
+This parser handles key-value pairs, quoted strings, and inline arrays - everything needed for post metadata. It deliberately doesn't support nested structures or multi-line values. If you need full YAML support, you could use the `symfony/yaml` package instead, but for frontmatter, this lightweight approach works well and avoids an additional dependency.
 
 ### Date Handling
 
@@ -308,7 +308,7 @@ private function parseDate(mixed $dateValue, string $filePath): Carbon
 }
 ```
 
-If no date is provided or parsing fails, the system falls back to the file's modification time. This means you can create a quick draft without worrying about the date field—it will default to when you created the file.
+If no date is provided or parsing fails, the system falls back to the file's modification time. This means you can create a quick draft without worrying about the date field - it will default to when you created the file.
 
 ## Controllers
 
@@ -400,7 +400,7 @@ public function extractHeadings(string $markdownContent): Collection
 }
 ```
 
-It returns a collection of arrays, each containing the heading text and a URL-safe slug. Laravel's `Str::slug()` handles the conversion—"The MarkdownPostService" becomes `the-markdownpostservice`.
+It returns a collection of arrays, each containing the heading text and a URL-safe slug. Laravel's `Str::slug()` handles the conversion - "The MarkdownPostService" becomes `the-markdownpostservice`.
 
 ### Injecting Anchor IDs
 
@@ -492,7 +492,7 @@ public function show(string $slug)
 }
 ```
 
-The Blade template conditionally renders the table of contents only when there are two or more headings—a single heading doesn't warrant navigation:
+The Blade template conditionally renders the table of contents only when there are two or more headings - a single heading doesn't warrant navigation:
 
 ```blade
 @if(isset($headings) && $headings->count() >= 2)
@@ -511,11 +511,11 @@ The Blade template conditionally renders the table of contents only when there a
 @endif
 ```
 
-Each link points to `#slug`, which the browser scrolls to thanks to the matching `id` attribute on the heading element. No JavaScript required—it's all standard anchor link behavior.
+Each link points to `#slug`, which the browser scrolls to thanks to the matching `id` attribute on the heading element. No JavaScript required - it's all standard anchor link behavior.
 
 ## Syntax Highlighting
 
-A technical blog without syntax highlighting is like a cookbook without pictures—technically complete, but missing something essential. Rather than relying on CommonMark's plain code block output, this blog uses highlight.js for language-aware syntax coloring.
+A technical blog without syntax highlighting is like a cookbook without pictures - technically complete, but missing something essential. Rather than relying on CommonMark's plain code block output, this blog uses highlight.js for language-aware syntax coloring.
 
 ### Why highlight.js?
 
@@ -568,7 +568,7 @@ The Monokai theme provides the colors, but a few CSS adjustments ensure code blo
 .prose pre {
     background: #272822 !important; /* Monokai dark background */
     border: 1px solid #49483e;
-    border-radius: 0; /* Pixel art aesthetic—no rounded corners */
+    border-radius: 0; /* Pixel art aesthetic;no rounded corners */
     padding: 1rem;
     white-space: pre-wrap; /* Wrap long lines */
     word-wrap: break-word;
@@ -676,7 +676,7 @@ Route::get('/posts/{slug}', [PostController::class, 'show'])
     ->where('slug', '[a-z0-9\-_]+');  // Security: constrain slug format
 ```
 
-This is a **file-based routing system**—unlike typical Laravel applications that use Eloquent models and database queries, this blog stores posts as markdown files in `storage/posts/`. When a request comes in for `/posts/my-post`, Laravel extracts the `slug` parameter (`my-post`), and the controller looks up `storage/posts/my-post.md` directly.
+This is a **file-based routing system**. Unlike typical Laravel applications that use Eloquent models and database queries, this blog stores posts as markdown files in `storage/posts/`. When a request comes in for `/posts/my-post`, Laravel extracts the `slug` parameter (`my-post`), and the controller looks up `storage/posts/my-post.md` directly.
 
 ### Why `storage/posts/`?
 
@@ -695,7 +695,7 @@ The slug-to-filename convention (`/posts/my-post` → `storage/posts/my-post.md`
 // File: storage/posts/building-state-machines-without-a-library.md
 ```
 
-When the `PostController::show()` method receives a slug, it doesn't need to query a database or scan a directory. It constructs the file path directly: `$filePath = $postsPath.'/'.$slug.'.md'`. This is an O(1) operation—constant time regardless of how many posts you have. Contrast this with a database-driven approach where you'd need a `SELECT` query, even with an index.
+When the `PostController::show()` method receives a slug, it doesn't need to query a database or scan a directory. It constructs the file path directly: `$filePath = $postsPath.'/'.$slug.'.md'`. This is an O(1) operation - constant time regardless of how many posts you have. Contrast this with a database-driven approach where you'd need a `SELECT` query, even with an index.
 
 ### A Departure from Typical Laravel Patterns
 

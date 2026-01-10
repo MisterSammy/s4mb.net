@@ -1,0 +1,4 @@
+Test file—with em dash
+Another test—here too
+And another—this one as well
+Final test—the last one

@@ -8,15 +8,15 @@ slug: role-based-permissions-jetstream-teams
 
 Laravel Jetstream ships with a teams feature that's typically used for multi-tenant SaaS applications. Each team is an organization, and users belong to one or more teams with different roles.
 
-But the default setup assumes everyone on a team is roughly equivalent—maybe some are admins and some are editors, but they're all "internal" users. What happens when you need to mix fundamentally different user types on the same team?
+But the default setup assumes everyone on a team is roughly equivalent - maybe some are admins and some are editors, but they're all "internal" users. What happens when you need to mix fundamentally different user types on the same team?
 
 Consider a coworking space management platform where each location is a "team," but that team includes both staff (who manage the space) and members (who book rooms and desks). Same team, very different permission needs.
 
-This post walks through adapting Jetstream's permission system for this hybrid model—using a **two-layer approach**: boolean flags for user type and Jetstream roles for team-scoped permissions.
+This post walks through adapting Jetstream's permission system for this hybrid model - using a **two-layer approach**: boolean flags for user type and Jetstream roles for team-scoped permissions.
 
 ## The Challenge
 
-Picture a coworking company with three locations: Downtown, Westside, and Midtown. Each location has its own staff—space managers who handle day-to-day operations—and members who pay for desk space and meeting rooms.
+Picture a coworking company with three locations: Downtown, Westside, and Midtown. Each location has its own staff - space managers who handle day-to-day operations - and members who pay for desk space and meeting rooms.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
@@ -36,7 +36,7 @@ Picture a coworking company with three locations: Downtown, Westside, and Midtow
 └─────────────────────┴─────────────────────┴─────────────────────────┘
 ```
 
-Here's where it gets interesting. **Staff and members both need to access the same location data**—but with completely different capabilities:
+Here's where it gets interesting. **Staff and members both need to access the same location data** - but with completely different capabilities:
 
 **What staff need to do:**
 - View and manage ALL bookings at their location
@@ -62,23 +62,23 @@ Jetstream::role('admin', 'Administrator', ['*'])->description('Full access');
 Jetstream::role('editor', 'Editor', ['read', 'create', 'update'])->description('Can edit content');
 ```
 
-These roles exist within the context of a team. A user might be an admin on Team A and an editor on Team B. But the implicit assumption is that all team members are fundamentally the same type of user—internal collaborators with varying levels of access.
+These roles exist within the context of a team. A user might be an admin on Team A and an editor on Team B. But the implicit assumption is that all team members are fundamentally the same type of user. Internal collaborators with varying levels of access.
 
-Our coworking scenario breaks this assumption. Staff and members aren't just users with different permission levels—they're **fundamentally different user populations** who happen to share a team context:
+Our coworking scenario breaks this assumption. Staff and members aren't just users with different permission levels - they're **fundamentally different user populations** who happen to share a team context:
 
 - Staff might work at multiple locations (Sarah (staff) could be the manager at both Downtown and Westside)
 - Members belong to one location and shouldn't even know other members exist
 - Staff need access to admin panels, reports, and management tools that members should never see
 - The UI, navigation, and entire experience differs by user type
 
-You can't solve this with Jetstream roles alone because the distinction between "staff" and "member" is **global to the user**, not scoped to a team. Sarah (staff) is staff everywhere she goes. Alice (member) is a member everywhere she goes. The question isn't "what role does this user have on this team?"—it's "what kind of user is this, and what can they do here?"
+You can't solve this with Jetstream roles alone because the distinction between "staff" and "member" is **global to the user**, not scoped to a team. Sarah (staff) is staff everywhere she goes. Alice (member) is a member everywhere she goes. The question isn't "what role does this user have on this team?" - it's "what kind of user is this, and what can they do here?"
 
 ## The Two-Layer Approach
 
 When you have fundamentally different user populations (staff vs members), you need two layers of authorization:
 
-1. **User Type (Global)** — Boolean flags on the User model to distinguish user populations
-2. **Team Permissions (Scoped)** — Jetstream roles define what users can do within a specific team
+1. **User Type (Global)**  -  Boolean flags on the User model to distinguish user populations
+2. **Team Permissions (Scoped)**  -  Jetstream roles define what users can do within a specific team
 
 The key insight: **User TYPE is global, but PERMISSIONS are team-scoped**.
 
@@ -93,7 +93,7 @@ protected $fillable = ['name', 'email', 'password', 'isStaff'];
 The `isStaff` flag answers: "What kind of user is this?" (global question)  
 Jetstream roles answer: "What can this user do in THIS team?" (team-scoped question)
 
-This isn't two competing systems—they solve different problems:
+This isn't two competing systems - they solve different problems:
 - **Boolean flags**: User belongs to a fundamentally different population
 - **Jetstream roles**: Permissions within a specific team/location context
 
@@ -191,7 +191,7 @@ public function hasPermission(string $ability): bool
 }
 ```
 
-This keeps permission checking simple throughout your application—no need to pass the team every time.
+This keeps permission checking simple throughout your application - no need to pass the team every time.
 
 ## Checking Permissions
 
@@ -362,7 +362,7 @@ Prefer permission-based checks over role-based checks for better flexibility. Pe
 
 ## Conditional UI Based on Permissions
 
-Staff like Sarah (staff) and Tom (staff) need check-in buttons, report links, and admin tools. Members like Alice (member) should never see these controls—not just be denied access, but not even know they exist.
+Staff like Sarah (staff) and Tom (staff) need check-in buttons, report links, and admin tools. Members like Alice (member) should never see these controls - not just be denied access, but not even know they exist.
 
 For granular UI control, you can register specific Gates or check permissions directly:
 
@@ -504,7 +504,7 @@ public function switchLocation(int $teamId): void
 }
 ```
 
-When Sarah (staff) switches from Downtown to Westside, her `currentTeam` changes, and all permission checks now evaluate against the Westside team. Her `isStaff` flag remains true—she's still staff—but her team-scoped permissions are now checked against her role at Westside.
+When Sarah (staff) switches from Downtown to Westside, her `currentTeam` changes, and all permission checks now evaluate against the Westside team. Her `isStaff` flag remains true - she's still staff - but her team-scoped permissions are now checked against her role at Westside.
 
 ## Extending Permission Checks with Wildcards
 
@@ -546,13 +546,13 @@ Jetstream::role('booking_manager', 'Booking Manager', [
 
 ## Going Further with Bouncer
 
-The hybrid approach with boolean flags, Gates, and Policies works great, but as your permission system grows more complex—especially if you need dynamic permissions or complex hierarchies—you might benefit from a dedicated package like [Bouncer](https://github.com/JosephSilber/bouncer).
+The hybrid approach with boolean flags, Gates, and Policies works great, but as your permission system grows more complex - especially if you need dynamic permissions or complex hierarchies - you might benefit from a dedicated package like [Bouncer](https://github.com/JosephSilber/bouncer).
 
 Bouncer provides:
-- **Database-stored permissions** — Define permissions dynamically without hardcoding in `JetstreamServiceProvider`
-- **Ability inheritance** — Permissions cascade through role hierarchies
-- **Cleaner API** — More expressive syntax for complex permission scenarios
-- **Caching** — Built-in performance optimizations for permission checks
+- **Database-stored permissions**  -  Define permissions dynamically without hardcoding in `JetstreamServiceProvider`
+- **Ability inheritance**  -  Permissions cascade through role hierarchies
+- **Cleaner API**  -  More expressive syntax for complex permission scenarios
+- **Caching**  -  Built-in performance optimizations for permission checks
 
 ### Using Bouncer with Jetstream Teams
 
@@ -587,10 +587,10 @@ class BookingPolicy
 ### When to Use Bouncer
 
 Consider Bouncer if you need:
-- **Dynamic permissions** — Permissions assigned at runtime, not just in code
-- **Complex hierarchies** — Roles that inherit from other roles
-- **Fine-grained ownership rules** — "own" permissions handled automatically
-- **Multi-tenant permissions** — Different permission sets per team/location
+- **Dynamic permissions**  -  Permissions assigned at runtime, not just in code
+- **Complex hierarchies**  -  Roles that inherit from other roles
+- **Fine-grained ownership rules**  -  "own" permissions handled automatically
+- **Multi-tenant permissions**  -  Different permission sets per team/location
 
 For simpler applications, Gates and Policies with Jetstream's built-in permissions are usually sufficient and keep your dependencies minimal.
 
@@ -598,12 +598,12 @@ For simpler applications, Gates and Policies with Jetstream's built-in permissio
 
 Jetstream's team and role system is flexible enough to handle mixed user populations. The key principles:
 
-1. **Use a two-layer approach** — Boolean flags (`isStaff`) distinguish user populations globally, while Jetstream roles handle team-scoped permissions
+1. **Use a two-layer approach**  -  Boolean flags (`isStaff`) distinguish user populations globally, while Jetstream roles handle team-scoped permissions
 2. **Define clear roles** for each user type with appropriate permissions using the `resource:action` naming convention
 3. **Add a simple `hasPermission()` helper** on the User model to make permission checking convenient throughout your application
-4. **Use Gates for user-type checks** — Create Gates like `beStaff` for reusable user-type authorization
-5. **Use Policies for model-specific authorization** — Handle "own" vs "all" permissions in dedicated policy classes that call `hasPermission()`
-6. **Prefer permission checks over role checks** — Permission-based checks are more granular and flexible than hardcoded role names
-7. **Consider Bouncer for advanced scenarios** — If you need dynamic permissions, complex hierarchies, or database-driven permissions, Bouncer provides a powerful alternative
+4. **Use Gates for user-type checks**  -  Create Gates like `beStaff` for reusable user-type authorization
+5. **Use Policies for model-specific authorization**  -  Handle "own" vs "all" permissions in dedicated policy classes that call `hasPermission()`
+6. **Prefer permission checks over role checks**  -  Permission-based checks are more granular and flexible than hardcoded role names
+7. **Consider Bouncer for advanced scenarios**  -  If you need dynamic permissions, complex hierarchies, or database-driven permissions, Bouncer provides a powerful alternative
 
-The result is a system where staff and members coexist on the same team, each seeing the interface and capabilities appropriate to their role. User type is handled globally via boolean flags, while permissions remain team-scoped through Jetstream roles—giving you the best of both worlds.
+The result is a system where staff and members coexist on the same team, each seeing the interface and capabilities appropriate to their role. User type is handled globally via boolean flags, while permissions remain team-scoped through Jetstream roles - giving you the best of both worlds.

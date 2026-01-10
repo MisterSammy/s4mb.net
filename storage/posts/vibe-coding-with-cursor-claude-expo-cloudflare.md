@@ -38,17 +38,17 @@ The architecture is relatively straightforward:
 └─────────────────────────────────────┘
 ```
 
-**Expo + React Native** made sense because I wanted native modules—specifically speech recognition and SQLite—without maintaining separate iOS and Android codebases. The managed workflow handles the native dependencies, and `expo-router` brings file-based routing similar to Next.js, which I've found makes navigation much more intuitive.
+**Expo + React Native** made sense because I wanted native modules - specifically speech recognition and SQLite - without maintaining separate iOS and Android codebases. The managed workflow handles the native dependencies, and `expo-router` brings file-based routing similar to Next.js, which I've found makes navigation much more intuitive.
 
 **Cloudflare Workers** became the backend because OpenAI API keys can't live in a mobile app. Someone would extract them from the binary within hours. Workers are globally distributed, have a generous free tier (which matters for a side project), and KV storage turned out to be a perfect fit for rate limiting counters and caching subscription status.
 
-**OpenAI's GPT-4o** handles recipe generation. I initially tried building a rule-based system with a recipe database, but it quickly became unwieldy. The AI approach lets me handle dietary restrictions, time constraints, and ingredient substitutions in natural language. The key was getting the prompts right—more on that later.
+**OpenAI's GPT-4o** handles recipe generation. I initially tried building a rule-based system with a recipe database, but it quickly became unwieldy. The AI approach lets me handle dietary restrictions, time constraints, and ingredient substitutions in natural language. The key was getting the prompts right - more on that later.
 
 **RevenueCat** manages in-app subscriptions. I didn't want to deal with App Store receipt validation myself, and RevenueCat abstracts that complexity while providing a unified API across platforms.
 
 ## The Backend: Cloudflare Workers
 
-The worker is relatively simple—it routes requests, validates inputs, checks rate limits, and calls OpenAI. But there are some interesting details in how rate limiting and subscription validation work.
+The worker is relatively simple - it routes requests, validates inputs, checks rate limits, and calls OpenAI. But there are some interesting details in how rate limiting and subscription validation work.
 
 ### Endpoint Structure
 
@@ -192,7 +192,7 @@ export async function checkRateLimit(
 }
 ```
 
-The key format is `ratelimit:${userId}` where `userId` comes from RevenueCat's `originalAppUserId`. The TTL handles cleanup automatically—counters expire after the window ends, so there's no manual cleanup required. If KV is unavailable (say, during a Cloudflare outage), the system fails open rather than blocking legitimate requests.
+The key format is `ratelimit:${userId}` where `userId` comes from RevenueCat's `originalAppUserId`. The TTL handles cleanup automatically - counters expire after the window ends, so there's no manual cleanup required. If KV is unavailable (say, during a Cloudflare outage), the system fails open rather than blocking legitimate requests.
 
 ### Subscription Validation and Caching
 
@@ -376,7 +376,7 @@ export const initDatabase = async (): Promise<SQLite.SQLiteDatabase> => {
 };
 ```
 
-SQLite doesn't support removing columns or changing types easily, so migrations only add columns with safe defaults. This keeps things simple—existing data stays valid, and new columns are optional.
+SQLite doesn't support removing columns or changing types easily, so migrations only add columns with safe defaults. This keeps things simple - existing data stays valid, and new columns are optional.
 
 ### Schema Evolution and Backwards Compatibility
 
@@ -412,7 +412,7 @@ function parseRecipeIngredients(rawJson: string): RecipeIngredient[] {
 }
 ```
 
-This backwards-compatible approach is simpler than migrating all records upfront. It also handles corrupt data gracefully—if parsing fails, you get an empty array rather than a crash.
+This backwards-compatible approach is simpler than migrating all records upfront. It also handles corrupt data gracefully - if parsing fails, you get an empty array rather than a crash.
 
 ### Speech Recognition (Development Build Only)
 
@@ -468,7 +468,7 @@ const handleSpeechResult = (transcript: string, isFinal: boolean) => {
 };
 ```
 
-The speech recognition system includes a 30-second auto-timeout to prevent extended recording sessions. This matters more than you'd think—when you're adding ingredients, you want to say "eggs, milk, butter" and have it stop, not keep recording while you walk around your kitchen.
+The speech recognition system includes a 30-second auto-timeout to prevent extended recording sessions. This matters more than you'd think - when you're adding ingredients, you want to say "eggs, milk, butter" and have it stop, not keep recording while you walk around your kitchen.
 
 ### API Client with Retry Logic
 
@@ -556,7 +556,7 @@ If your `wrangler.toml` defines a production environment, you must deploy with:
 npx wrangler deploy --env production
 ```
 
-Without `--env production`, the KV namespaces and secrets aren't available. The deployment succeeds, but the worker fails at runtime. This is easy to miss because the deployment itself doesn't error—the worker just can't access required resources.
+Without `--env production`, the KV namespaces and secrets aren't available. The deployment succeeds, but the worker fails at runtime. This is easy to miss because the deployment itself doesn't error - the worker just can't access required resources.
 
 ## When This Stack Works
 
@@ -576,7 +576,7 @@ Consider alternatives if:
 
 ## Final Thoughts
 
-This project reinforced a few things for me. First, AI is excellent at tasks with fuzzy requirements—generating recipes based on "whatever's in my fridge" is exactly the kind of problem that's tedious to solve with rules but natural for language models. Second, prompt engineering matters more than I initially expected. The difference between a good and bad prompt isn't subtle—it's the difference between "pan-seared duck breast with shallot confit" and "chicken tacos with stuff you already have."
+This project reinforced a few things for me. First, AI is excellent at tasks with fuzzy requirements - generating recipes based on "whatever's in my fridge" is exactly the kind of problem that's tedious to solve with rules but natural for language models. Second, prompt engineering matters more than I initially expected. The difference between a good and bad prompt isn't subtle - it's the difference between "pan-seared duck breast with shallot confit" and "chicken tacos with stuff you already have."
 
 And finally, there's something satisfying about building tools you actually use. This app lives on my phone, and I've used it dozens of times since building it. That's the real test of whether something works: not whether it's technically impressive, but whether you reach for it when you need it.
 

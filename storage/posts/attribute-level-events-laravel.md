@@ -1,12 +1,12 @@
 ---
 title: "Attribute-Level Events in Laravel: Package vs. Native Approaches"
 date: 2025-01-09
-excerpt: "Model events are great, but what if you need to fire events only when specific attributes change? Here's two approaches—one with a package, one native."
+excerpt: "Model events are great, but what if you need to fire events only when specific attributes change? Here's two approaches - one with a package, one native."
 tags: [laravel, events, eloquent, php, architecture]
 slug: attribute-level-events-laravel
 ---
 
-Laravel's Eloquent models fire events when things happen—`created`, `updated`, `deleted`, and so on. These events are useful for triggering side effects like sending notifications, updating caches, or logging changes.
+Laravel's Eloquent models fire events when things happen - `created`, `updated`, `deleted`, and so on. These events are useful for triggering side effects like sending notifications, updating caches, or logging changes.
 
 But there's a limitation. The `updated` event fires whenever *any* attribute changes. If you only care about status changes, you end up checking inside your listener:
 
@@ -32,11 +32,11 @@ This post shows two approaches: using a package for declarative syntax, and usin
 ## The Scenario: Pet Grooming Appointments
 
 Consider a pet grooming salon where appointments move through various statuses:
-- **Scheduled** — Appointment booked
-- **Checked In** — Pet has arrived
-- **In Progress** — Grooming underway
-- **Completed** — Ready for pickup
-- **Cancelled** — Appointment cancelled
+- **Scheduled**  -  Appointment booked
+- **Checked In**  -  Pet has arrived
+- **In Progress**  -  Grooming underway
+- **Completed**  -  Ready for pickup
+- **Cancelled**  -  Appointment cancelled
 
 Different status changes trigger different actions:
 - Moving to "Checked In" notifies the groomer
@@ -381,6 +381,6 @@ class AppointmentObserver
 
 Attribute-level events add surgical precision to Laravel's event system. Instead of checking which attributes changed inside every listener, you declare which attributes matter and write focused handlers for each.
 
-For most applications, **the native observer approach is recommended**—it has zero dependencies and gives you full control over the logic. The package approach is a good choice if you prefer declarative syntax and have many attributes to track.
+For most applications, **the native observer approach is recommended** - it has zero dependencies and gives you full control over the logic. The package approach is a good choice if you prefer declarative syntax and have many attributes to track.
 
 Either way, the result is cleaner code, easier testing, and a clear audit trail of what responds to what.

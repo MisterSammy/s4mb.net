@@ -13,9 +13,9 @@ Instead of making users fill out blank forms every time, let them select a templ
 ## The Scenario: Wedding Planning Packages
 
 A wedding planning business offers different service tiers:
-- **Full Planning** — End-to-end coordination from engagement to wedding day
-- **Partial Planning** — Specific aspects like venue selection or vendor management
-- **Day-Of Coordination** — On-the-day logistics and timeline management
+- **Full Planning**  -  End-to-end coordination from engagement to wedding day
+- **Partial Planning**  -  Specific aspects like venue selection or vendor management
+- **Day-Of Coordination**  -  On-the-day logistics and timeline management
 
 Each package has standard inclusions, exclusions, pricing, and terms. But every couple's wedding is unique, so planners need to customize.
 
@@ -55,7 +55,7 @@ class PackageTemplate extends Model
 }
 ```
 
-This is a wide table—lots of text columns. That's fine. Templates are read frequently but written rarely. The simplicity of a single table outweighs normalization concerns.
+This is a wide table - lots of text columns. That's fine. Templates are read frequently but written rarely. The simplicity of a single table outweighs normalization concerns.
 
 ## Seeding Templates
 
@@ -93,7 +93,7 @@ PackageTemplate::create([
 
 PackageTemplate::create([
     'name' => 'Day-Of Coordination',
-    'description' => "You've done the planning—we'll execute it flawlessly on your wedding day.",
+    'description' => "You've done the planning - we'll execute it flawlessly on your wedding day.",
     'included_services' => "Day-of coordination includes:\n" .
         "- Final planning meeting 4-6 weeks before wedding\n" .
         "- Vendor confirmation and timeline distribution\n" .
@@ -397,7 +397,7 @@ $proposal = Proposal::createFromTemplate($template, [
 
 **Efficiency.** Users fill in the blanks instead of writing from scratch. A 20-field form becomes 3-4 customizations.
 
-**Maintainability.** Update a template, and all future proposals use the new language. (Existing proposals keep their values—templates are copied, not referenced.)
+**Maintainability.** Update a template, and all future proposals use the new language. (Existing proposals keep their values - templates are copied, not referenced.)
 
 **Audit trail.** You can track which template a proposal started from and what was changed.
 
@@ -412,4 +412,4 @@ Template-based generation works well for:
 - Email templates
 - Any form with repetitive boilerplate
 
-The more consistent your documents, the more value templates provide. If every document is truly unique, templates won't help. But in most service contexts, 80% of the content is standard—templates let users focus on the 20% that matters.
+The more consistent your documents, the more value templates provide. If every document is truly unique, templates won't help. But in most service contexts, 80% of the content is standard - templates let users focus on the 20% that matters.

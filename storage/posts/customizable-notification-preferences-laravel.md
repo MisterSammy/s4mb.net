@@ -12,7 +12,7 @@ The solution is user-controlled notification preferences. Let users choose which
 
 Most tutorials solve this by creating a `notification_types` table in your database. But here's a question worth asking: if your notification types are developer-defined constants that don't change at runtime, why involve the database at all?
 
-This post shows you a better approach: use a **PHP backed enum** as your single source of truth for notification types. You get type safety, IDE autocomplete, zero migration overhead when adding new types, and all metadata lives right next to the definition. The database only stores user preferences—not the types themselves.
+This post shows you a better approach: use a **PHP backed enum** as your single source of truth for notification types. You get type safety, IDE autocomplete, zero migration overhead when adding new types, and all metadata lives right next to the definition. The database only stores user preferences - not the types themselves.
 
 We'll build the complete system: the enum definition, simplified database schema, Livewire component for preferences, and query scopes that efficiently find who should be notified.
 
@@ -36,7 +36,7 @@ Different users care about different events. Let them choose.
 
 ## The Database Schema
 
-You only need one table: `notification_preferences`. Notice we don't need a `notification_types` table—the enum is our source of truth.
+You only need one table: `notification_preferences`. Notice we don't need a `notification_types` table - the enum is our source of truth.
 
 ```php
 Schema::create('notification_preferences', function (Blueprint $table) {
@@ -150,7 +150,7 @@ This enum gives us several benefits:
 
 - **Type safety**: `NotificationType::AssignmentGraded` instead of `'Assignment Graded'` means typos are caught at compile time, not runtime.
 - **IDE autocomplete**: Your editor knows all available notification types and can suggest them.
-- **No migrations**: Adding a new notification type is as simple as adding a new enum case—no database changes needed.
+- **No migrations**: Adding a new notification type is as simple as adding a new enum case - no database changes needed.
 - **Metadata lives with the definition**: Label, description, category, and default state are all defined right where the type is declared.
 - **Easy refactoring**: Rename an enum case, and your IDE can update all usages automatically.
 
@@ -218,7 +218,7 @@ public function wantsNotification(NotificationType $type): bool
 }
 ```
 
-Notice how `wantsNotification()` now accepts a `NotificationType` enum directly—type-safe and impossible to typo.
+Notice how `wantsNotification()` now accepts a `NotificationType` enum directly - type-safe and impossible to typo.
 
 ## The Preference UI
 
@@ -318,7 +318,7 @@ The template with grouped notifications:
 </div>
 ```
 
-Each checkbox click immediately updates the database. No save button needed—changes are instant.
+Each checkbox click immediately updates the database. No save button needed - changes are instant.
 
 ## Finding Who to Notify
 
@@ -510,11 +510,11 @@ A notification preference system respects your users' attention. Instead of blas
 The enum-based approach we've built gives you several advantages over the traditional database-table approach:
 
 - **Type safety**: IDE autocomplete and compile-time checks prevent typos like `'Assigment Graded'` (notice the typo).
-- **Simpler schema**: One table for preferences instead of two—no need to manage a registry table.
+- **Simpler schema**: One table for preferences instead of two - no need to manage a registry table.
 - **Zero migration overhead**: Adding a new notification type is as simple as adding a new enum case. No database migration, no seeding, no coordination.
 - **Metadata co-location**: Label, description, category, and default state all live right where the type is defined, making it easy to understand and modify.
 - **Refactor-friendly**: Rename an enum case, and your IDE can update all usages automatically.
 
-The implementation scales cleanly: add new enum cases as your application grows, and the rest of the system adapts automatically. The database only stores what matters—user preferences—while the developer-defined types live in code where they belong.
+The implementation scales cleanly: add new enum cases as your application grows, and the rest of the system adapts automatically. The database only stores what matters;user preferences. While the developer-defined types live in code where they belong.
 
 Your users' inboxes will thank you, and so will your future self when you need to add a new notification type.
