@@ -1,7 +1,7 @@
 ---
 title: "Role-Based Permissions in Multi-Tenant Laravel with Jetstream Teams"
 date: 2025-01-09
-excerpt: "Jetstream's team feature is often used for organizations. But what if you need different permission sets for clients vs. staff on the same team? Here's how to make it work."
+excerpt: "Jetstream's team feature is often used for organizations. Here's how to use it for a coworking space where staff manage spaces and members book rooms."
 tags: [laravel, jetstream, permissions, multi-tenant, teams]
 slug: role-based-permissions-jetstream-teams
 ---
@@ -10,9 +10,9 @@ Laravel Jetstream ships with a teams feature that's typically used for multi-ten
 
 But the default setup assumes everyone on a team is roughly equivalent—maybe some are admins and some are editors, but they're all "internal" users. What happens when you need to mix fundamentally different user types on the same team?
 
-Consider a professional services platform where each client is a "team," but that team includes both the client's people (who have limited access) and staff members (who manage the account). Same team, very different permission needs.
+Consider a coworking space management platform where each location is a "team," but that team includes both staff (who manage the space) and members (who book rooms and desks). Same team, very different permission needs.
 
-This post walks through adapting Jetstream's permission system for this hybrid model.
+This post walks through adapting Jetstream's permission system for this hybrid model—using a **single, consistent permission system** rather than mixing approaches.
 
 ## The Challenge
 
@@ -27,376 +27,388 @@ These roles exist within the context of a team. A user might be an admin on Team
 
 But what if you have two fundamentally different user populations?
 
-1. **Staff members** — Employees who manage client accounts, create content, run verifications
-2. **Client users** — The clients themselves, who can view their account and approve documents
+1. **Space managers** — Staff who manage bookings, handle check-ins, and configure rooms
+2. **Members** — Coworking members who book rooms, view their reservations, and update their profiles
 
-Staff need granular permissions for all the management functions. Clients need a simpler set focused on their own account. And they're both members of the same team (the client's "workspace").
+Staff need granular permissions for all the management functions. Members need a simpler set focused on their own bookings. And they're both members of the same team (the coworking location).
+
+## The Single Source of Truth Principle
+
+A common mistake is creating **two parallel permission systems**—boolean flags on the User model (`isStaff`, `isAdmin`) plus Jetstream roles. This leads to confusion:
+
+```php
+// ❌ DON'T DO THIS - Two competing systems
+protected $fillable = ['isStaff', 'isAdmin', 'isFinance'];  // Flags
+
+// Plus Jetstream roles
+Jetstream::role('manager', 'Manager', ['bookings:*']);
+
+// Now you have to check both everywhere
+if ($user->isStaff && $user->hasPermission('bookings:create')) { ... }
+```
+
+Instead, **use Jetstream roles as your single source of truth**. If you need additional capabilities, add them as permissions within the role system.
 
 ## Defining Roles for Different User Types
 
-Start by defining roles that map to your user populations. In `JetstreamServiceProvider`:
+Define roles that map to your user populations. In your `JetstreamServiceProvider`:
 
 ```php
-protected function configurePermissions()
+protected function configurePermissions(): void
 {
     Jetstream::defaultApiTokenPermissions(['read']);
 
-    // Client-side roles (limited access)
-    Jetstream::role('account-holder', 'Account Holder', [
-        'client:read',
-        'client:update',
-        'instruction:read',
-        'instruction:set-client-accepted',
-        'instruction:set-client-declined',
-        'verification:read',
-        'verification:update',
-    ])->description('Default role for clients. Can view account and approve documents.');
+    // Member role (limited access to own resources)
+    Jetstream::role('member', 'Member', [
+        'profile:read',
+        'profile:update',
+        'bookings:create',
+        'bookings:read-own',
+        'bookings:cancel-own',
+        'rooms:read',
+        'events:read',
+    ])->description('Coworking member. Can book rooms and manage own reservations.');
 
-    Jetstream::role('officer', 'Officer', [
-        'client:read',
-        'client:update',
-        'instruction:read',
-        'instruction:set-client-accepted',
-        'instruction:set-client-declined',
-        'verification:read',
-        'verification:update',
-    ])->description('Company officer. Same permissions as account holder.');
+    // Space manager role (full location management)
+    Jetstream::role('space_manager', 'Space Manager', [
+        // Profile management
+        'profile:read',
+        'profile:update',
 
-    Jetstream::role('psc', 'Person with Significant Control', [
-        'client:read',
-        'client:update',
-        'instruction:read',
-        'instruction:set-client-accepted',
-        'instruction:set-client-declined',
-        'verification:read',
-        'verification:update',
-    ])->description('PSC. Same permissions as account holder.');
+        // Room management
+        'rooms:create',
+        'rooms:read',
+        'rooms:update',
+        'rooms:delete',
 
-    // Staff role (full access)
-    Jetstream::role('adviser', 'Adviser', [
-        // Client management
-        'client:create',
-        'client:read',
-        'client:update',
-        'client:delete',
-        'client:skip-verification',
-        'client:set-active',
-        'client:set-conflict-checks',
-        'client:set-risk-assessment',
-        'client:set-aml-verification',
+        // Booking management (all bookings, not just own)
+        'bookings:create',
+        'bookings:read',
+        'bookings:update',
+        'bookings:delete',
+        'bookings:check-in',
+        'bookings:check-out',
 
-        // Conflict checks
-        'client-conflict-check:create',
-        'client-conflict-check:read',
-        'client-conflict-check:delete',
+        // Member management
+        'members:read',
+        'members:update',
+        'members:suspend',
 
-        // Risk assessments
-        'client-risk-assessment:create',
-        'client-risk-assessment:read',
-        'client-risk-assessment:delete',
+        // Events
+        'events:create',
+        'events:read',
+        'events:update',
+        'events:delete',
 
-        // Instructions
-        'instruction:create',
-        'instruction:read',
-        'instruction:update',
-        'instruction:delete',
-        'instruction:set-instruction-form-client-review',
-        'instruction:set-instruction-form-draft',
-        'instruction:set-active',
-        'instruction:set-risk-assessment',
+        // Reports
+        'reports:view',
+        'reports:export',
 
-        // Instruction risk assessments
-        'instruction-risk-assessment:create',
-        'instruction-risk-assessment:read',
-        'instruction-risk-assessment:delete',
+        // Admin panel access
+        'admin:access',
+    ])->description('Staff member who manages the coworking space.');
 
-        // File reviews
-        'instruction-file-review:create',
-        'instruction-file-review:read',
-        'instruction-file-review:update',
-        'instruction-file-review:delete',
-
-        // Verifications
-        'verification:create',
-        'verification:read',
-        'verification:update',
-        'verification:request',
-
-        // Notes
-        'note:create',
-        'note:read',
-        'note:delete',
-    ])->description('Staff member with full client management access.');
+    // Location admin (can also manage staff)
+    Jetstream::role('location_admin', 'Location Admin', [
+        '*', // Full access to everything
+    ])->description('Full administrative access to the location.');
 }
 ```
 
-Notice the permission naming convention: `resource:action`. This makes permissions scannable and predictable. When you need a new permission, you know the format.
-
-## User Type Flags
-
-Roles alone don't capture everything. Some permissions depend on global user attributes, not team membership. Add flags to your User model:
-
-```php
-protected $fillable = [
-    'name', 
-    'email', 
-    'password', 
-    'isStaff',           // Is this a staff member?
-    'isApprovingDirector', // Can approve documents?
-    'isFinance',          // Can confirm payments?
-    'isAdmin',            // Can access admin panel?
-    'current_team_id'
-];
-```
-
-These flags enable checks that cross team boundaries:
-
-```php
-public function canAccessFilament(): bool
-{
-    return $this->isStaff && $this->hasVerifiedEmail() && $this->isAdmin;
-}
-
-public function canSeeAll(): bool
-{
-    if (!$this->isStaff) return false;
-    if ($this->isApprovingDirector) return true;
-    if ($this->isFinance) return true;
-    if ($this->isAdmin) return true;
-    return false;
-}
-```
+Notice the permission naming convention: `resource:action`. This makes permissions scannable and predictable. The `-own` suffix indicates actions limited to the user's own resources.
 
 ## Checking Permissions
 
-Jetstream provides `hasTeamPermission()` to check if a user has a permission on a specific team. Wrap it for convenience:
+Jetstream provides `hasTeamPermission()` to check if a user has a permission on a specific team. Create a convenient wrapper:
 
 ```php
+// In your User model
 public function hasPermission(string $ability): bool
 {
-    return $this->hasTeamPermission($this->currentTeam()->first(), $ability);
+    $team = $this->currentTeam;
+    
+    if (!$team) {
+        return false;
+    }
+    
+    return $this->hasTeamPermission($team, $ability);
 }
 ```
 
 Now controllers can check permissions cleanly:
 
 ```php
-public function setActive(Client $client)
+public function store(Request $request)
 {
-    if (!Auth::user()->hasPermission('client:set-active')) {
+    if (!auth()->user()->hasPermission('bookings:create')) {
         abort(403);
     }
     
-    // ... perform action
+    // Create booking...
 }
 ```
 
-## Role-Based Checks
+## Handling "Own" vs "All" Permissions
 
-Sometimes you need to know the user's role, not just their permissions:
+Some permissions need context—members can read their own bookings, but managers can read all bookings. Handle this with a helper method:
 
 ```php
-public function hasRole(string $role): bool
+// In your User model
+public function canAccessBooking(Booking $booking): bool
 {
-    $dbRole = DB::table('team_user')
-        ->select('role')
-        ->where('team_id', $this->currentTeam()->first()->id)
-        ->where('user_id', $this->id)
-        ->first()
-        ->role;
-        
-    return ($dbRole === $role);
-}
-
-public function getRole()
-{
-    return DB::table('team_user')
-        ->select('role')
-        ->where('team_id', $this->currentTeam()->first()->id)
-        ->where('user_id', $this->id)
-        ->first()
-        ->role;
-}
-```
-
-This lets you show different UI based on role:
-
-```blade
-@if(Auth::user()->hasRole('adviser'))
-    {{-- Staff-specific UI --}}
-    <button onclick="createConflictCheck()">Create Conflict Check</button>
-@else
-    {{-- Client-facing UI --}}
-    <p>Your adviser is reviewing your application.</p>
-@endif
-```
-
-## Combining Permissions with Status Checks
-
-Permissions answer "can this user ever do this action?" Status evaluators answer "is this action valid right now?" Combine them:
-
-```php
-public function setStatusRiskAssessment(Client $client)
-{
-    // Permission check: Can this user type perform this action?
-    if (!Auth::user()->hasPermission('client:set-risk-assessment')) {
-        abort(403);
+    // Can read all bookings
+    if ($this->hasPermission('bookings:read')) {
+        return true;
     }
     
-    // Status check: Is this action valid in the current state?
-    if (!ClientStatusEvaluator::canSetRiskAssessmentClient($client->status)) {
-        abort(400, 'Cannot reset to risk assessment from current status');
+    // Can only read own bookings
+    if ($this->hasPermission('bookings:read-own') && $booking->user_id === $this->id) {
+        return true;
     }
+    
+    return false;
+}
 
-    $client->status = ClientStatus::RISK_ASSESSMENT->value;
-    $client->save();
-
-    return redirect()->back();
+public function canCancelBooking(Booking $booking): bool
+{
+    // Can cancel any booking
+    if ($this->hasPermission('bookings:delete')) {
+        return true;
+    }
+    
+    // Can only cancel own bookings
+    if ($this->hasPermission('bookings:cancel-own') && $booking->user_id === $this->id) {
+        return true;
+    }
+    
+    return false;
 }
 ```
 
-## Conditional UI Based on Permissions
-
-Use permissions to show/hide UI elements:
+Or use a policy:
 
 ```php
-// In controller
-$userPermissions = [
-    'note:read' => $authUser->hasPermission('note:read'),
-    'client-risk-assessment:read' => $authUser->hasPermission('client-risk-assessment:read'),
-    'client-conflict-check:read' => $authUser->hasPermission('client-conflict-check:read'),
-    'instruction:read' => $authUser->hasPermission('instruction:read'),
-    'verification:request' => $authUser->hasPermission('verification:request'),
-];
+class BookingPolicy
+{
+    public function view(User $user, Booking $booking): bool
+    {
+        return $user->hasPermission('bookings:read') 
+            || ($user->hasPermission('bookings:read-own') && $booking->user_id === $user->id);
+    }
 
-return view('clients.show', [
-    'client' => $client,
-    'userPermissions' => $userPermissions,
-]);
+    public function delete(User $user, Booking $booking): bool
+    {
+        return $user->hasPermission('bookings:delete')
+            || ($user->hasPermission('bookings:cancel-own') && $booking->user_id === $user->id);
+    }
+}
+```
+
+## Role-Based UI Variations
+
+Sometimes you need different UI for different roles. Use role checks for this:
+
+```php
+// In your User model - use the relationship, not raw queries
+public function teamRole(): ?string
+{
+    $membership = $this->currentTeam?->users()
+        ->where('user_id', $this->id)
+        ->first();
+    
+    return $membership?->pivot->role;
+}
+
+public function isSpaceManager(): bool
+{
+    return in_array($this->teamRole(), ['space_manager', 'location_admin']);
+}
 ```
 
 In Blade:
 
 ```blade
-@if($userPermissions['client-conflict-check:read'])
-    <div class="tab" id="conflict-checks">
-        {{-- Conflict check content --}}
-    </div>
-@endif
-
-@if($userPermissions['verification:request'])
-    <button onclick="requestVerification()">Request Verification</button>
+@if(auth()->user()->isSpaceManager())
+    {{-- Staff dashboard with management tools --}}
+    <x-manager-dashboard :location="$location" />
+@else
+    {{-- Member dashboard with booking interface --}}
+    <x-member-dashboard :bookings="$bookings" />
 @endif
 ```
 
-## Default Permissions on User Creation
+## Conditional UI Based on Permissions
 
-When staff members are created, give them sensible notification defaults:
+For granular UI control, check specific permissions:
+
+```blade
+@can('bookings:check-in')
+    <button wire:click="checkIn({{ $booking->id }})">
+        Check In
+    </button>
+@endcan
+
+@can('reports:view')
+    <a href="{{ route('reports.index') }}">
+        View Reports
+    </a>
+@endcan
+```
+
+Register permissions with Laravel's Gate:
 
 ```php
-protected static function boot()
+// In AuthServiceProvider
+public function boot(): void
 {
-    parent::boot();
+    Gate::define('bookings:check-in', function (User $user) {
+        return $user->hasPermission('bookings:check-in');
+    });
 
-    static::created(function($model) {
-        if ($model->isStaff) {
-            // Subscribe staff to relevant notifications
-            DB::table('notification_user')->insert([
-                ['notification_id' => 3, 'user_id' => $model->id],  // Client Status Changed
-                ['notification_id' => 10, 'user_id' => $model->id], // Instruction Status Changed
-                ['notification_id' => 12, 'user_id' => $model->id], // Note Created
-                ['notification_id' => 13, 'user_id' => $model->id], // New Comment
-                ['notification_id' => 14, 'user_id' => $model->id], // Verification Started
-                ['notification_id' => 15, 'user_id' => $model->id], // Verification Completed
-            ]);
-        } else {
-            // For client users, create verification record
-            Verification::create([
-                'user_id' => $model->id,
-                'status' => 'not requested',
-                'external_user_id' => uniqid()
-            ]);
-        }
+    Gate::define('reports:view', function (User $user) {
+        return $user->hasPermission('reports:view');
     });
 }
 ```
 
-Staff and clients have different onboarding flows, handled at the model level.
-
-## Extending Jetstream's Permission Check
-
-Jetstream's default `hasTeamPermission()` checks for exact matches or wildcard (`*`). Extend it for pattern matching:
+Or register them dynamically:
 
 ```php
-public function hasTeamPermission($team, string $permission)
+// In AuthServiceProvider
+public function boot(): void
+{
+    Gate::before(function (User $user, string $ability) {
+        // Check Jetstream team permissions for any ability
+        if ($user->currentTeam && $user->hasTeamPermission($user->currentTeam, $ability)) {
+            return true;
+        }
+        
+        return null; // Fall through to other gates
+    });
+}
+```
+
+## Admin Panel Access
+
+For Filament or other admin panels, check permissions in the panel provider:
+
+```php
+// In your Filament AdminPanelProvider
+public function panel(Panel $panel): Panel
+{
+    return $panel
+        ->authGuard('web')
+        ->login()
+        ->authMiddleware([
+            Authenticate::class,
+        ])
+        ->middleware([
+            // Custom middleware to check admin:access permission
+            EnsureUserHasAdminAccess::class,
+        ]);
+}
+```
+
+The middleware:
+
+```php
+class EnsureUserHasAdminAccess
+{
+    public function handle(Request $request, Closure $next): Response
+    {
+        if (!auth()->user()?->hasPermission('admin:access')) {
+            abort(403, 'You do not have access to the admin panel.');
+        }
+
+        return $next($request);
+    }
+}
+```
+
+## Switching Between Locations
+
+Staff members might work at multiple locations. Jetstream handles team switching natively:
+
+```php
+public function switchToLocation(int $teamId): RedirectResponse
+{
+    $team = Team::findOrFail($teamId);
+
+    if (!auth()->user()->belongsToTeam($team)) {
+        abort(403, 'You do not have access to this location.');
+    }
+
+    auth()->user()->switchTeam($team);
+    
+    return redirect()->route('dashboard');
+}
+```
+
+In Livewire:
+
+```php
+public function switchLocation(int $teamId): void
+{
+    $team = Team::findOrFail($teamId);
+
+    if (!auth()->user()->belongsToTeam($team)) {
+        $this->dispatch('notify', message: 'Access denied', type: 'error');
+        return;
+    }
+
+    auth()->user()->switchTeam($team);
+    
+    $this->redirect(route('dashboard'));
+}
+```
+
+## Extending Permission Checks with Wildcards
+
+Jetstream's default `hasTeamPermission()` checks for exact matches or the `*` wildcard. Extend it to support pattern matching:
+
+```php
+// In your User model, override the method
+public function hasTeamPermission($team, string $permission): bool
 {
     if (!$this->belongsToTeam($team)) {
         return false;
     }
 
-    // Check API token permissions if using Sanctum
-    if (in_array(HasApiTokens::class, class_uses_recursive($this)) &&
-        !$this->tokenCan($permission) &&
-        $this->currentAccessToken() !== null) {
-        return false;
-    }
-
     $permissions = $this->teamPermissions($team);
 
-    return in_array($permission, $permissions) ||
-           in_array('*', $permissions) ||
-           // Support wildcard patterns like '*:create'
-           (Str::endsWith($permission, ':create') && in_array('*:create', $permissions)) ||
-           (Str::endsWith($permission, ':update') && in_array('*:update', $permissions));
+    // Exact match or full wildcard
+    if (in_array($permission, $permissions) || in_array('*', $permissions)) {
+        return true;
+    }
+
+    // Support resource:* wildcard (e.g., 'bookings:*' matches 'bookings:create')
+    [$resource, $action] = explode(':', $permission) + [null, null];
+    if ($resource && in_array("{$resource}:*", $permissions)) {
+        return true;
+    }
+
+    return false;
 }
 ```
 
 Now you can define roles with pattern permissions:
 
 ```php
-Jetstream::role('creator', 'Creator', [
-    '*:read',   // Can read everything
-    '*:create', // Can create everything
-])->description('Can read and create but not update or delete.');
-```
-
-## Switching Between Teams/Clients
-
-Staff members work with multiple clients. Provide a way to switch context:
-
-```php
-public function switchClient($team_id)
-{
-    $team = Jetstream::newTeamModel()->findOrFail($team_id);
-
-    if (!$this->switchTeam($team)) {
-        abort(403, 'You do not have access to this client');
-    }
-
-    return true;
-}
-```
-
-In a Livewire component:
-
-```php
-public function switchToClient($teamId)
-{
-    Auth::user()->switchClient($teamId);
-    
-    return redirect()->to('/clients/' . Team::find($teamId)->client->uuid);
-}
+Jetstream::role('booking_manager', 'Booking Manager', [
+    'bookings:*',  // All booking permissions
+    'rooms:read',  // But only read rooms
+])->description('Can manage all bookings but not rooms.');
 ```
 
 ## Summary
 
-Jetstream's team and role system is flexible enough to handle mixed user populations. The key adaptations:
+Jetstream's team and role system is flexible enough to handle mixed user populations. The key principles:
 
-1. **Define roles for each user type** with appropriate permissions
-2. **Add user-level flags** for global capabilities (staff, admin, etc.)
-3. **Combine permission checks with status checks** for complete authorization
-4. **Use role checks for UI variations** between user types
-5. **Set up user-type-specific defaults** at creation time
+1. **Use a single permission system** — Don't mix boolean flags with roles
+2. **Define clear roles** for each user type with appropriate permissions
+3. **Use the `resource:action` naming convention** for scannable permissions
+4. **Handle "own" vs "all"** with `-own` suffixed permissions and policies
+5. **Check permissions via policies and gates** for consistent authorization
+6. **Extend wildcards** if you need pattern matching
 
-The result is a system where clients and staff coexist on the same team, each seeing the interface and capabilities appropriate to their role.
-
+The result is a system where staff and members coexist on the same team, each seeing the interface and capabilities appropriate to their role—all managed through a single, consistent permission system.

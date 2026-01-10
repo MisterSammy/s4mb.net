@@ -37,10 +37,10 @@ return [
 
     // IPs that are allowed (when whitelist mode is enabled)
     'whitelist' => [
-        '82.38.126.30',      // Office IP
-        '87.224.8.52',       // CEO home
-        '51.14.88.163',      // VPN exit
-        '167.98.226.202',    // Remote employee
+        '192.0.2.10',        // Office IP
+        '198.51.100.25',     // CEO home
+        '203.0.113.50',      // VPN exit
+        '192.0.2.100',       // Remote employee
     ],
 
     'responses' => [
@@ -165,8 +165,8 @@ For small teams, editing the config file works. For larger organizations, consid
 Then manage IPs via Artisan:
 
 ```bash
-php artisan firewall:whitelist 192.168.1.100
-php artisan firewall:remove 192.168.1.100
+php artisan firewall:whitelist 192.0.2.100
+php artisan firewall:remove 192.0.2.100
 php artisan firewall:list
 ```
 
@@ -186,8 +186,8 @@ Allow entire subnets with CIDR notation:
 
 ```php
 'whitelist' => [
-    '192.168.1.0/24',      // All of 192.168.1.x
-    '10.0.0.0/8',          // All internal 10.x.x.x
+    '192.0.2.0/24',        // Office network (docs example range)
+    '10.0.0.0/8',          // Internal private network
 ],
 ```
 
@@ -229,7 +229,7 @@ Get alerted when attacks are detected:
     'enabled' => true,
     'users' => [
         'emails' => [
-            'security@yourcompany.com',
+            'security@example.com',
         ],
     ],
     'channels' => [
@@ -283,4 +283,3 @@ IP whitelisting dramatically reduces your admin panel's attack surface. Instead 
 The `pragmarx/firewall` package makes implementation straightforward—configure your IPs, apply the middleware, and unauthorized requests never reach your application code.
 
 For internal tools and admin panels, it's one of the simplest security wins available.
-

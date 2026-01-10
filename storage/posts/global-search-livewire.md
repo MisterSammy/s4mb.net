@@ -1,95 +1,54 @@
 ---
 title: "Building a Global Search Component with Livewire"
 date: 2025-01-09
-excerpt: "A configurable search component that queries multiple models and returns unified results. No JavaScript required."
+excerpt: "Quick and dirty MySQL search with Livewire. Copy it, ship it, move on. For production, use Typesense."
 tags: [laravel, livewire, search, components]
 slug: global-search-livewire
 ---
 
-Users expect search to work everywhere. Type a name, find a client. Type a project title, find the project. They don't want to navigate to specific pages first—they want a universal search box.
+Sometimes you just need search to work. Not "proper" search with fancy indexing and typo tolerance—just a text box that finds stuff. You've got a deadline, a demo tomorrow, or a client who swears they'll "add real search later."
 
-Building this with traditional request/response requires page reloads or a separate JavaScript frontend. With Livewire, you get real-time search with zero JavaScript configuration.
+This is that search. Quick, dirty, and MySQL-powered. Copy it, ship it, move on with your life.
+
+> **For production apps:** This MySQL approach works for small datasets. For anything serious, use [Typesense](https://typesense.org/)—it's open-source, blazing fast, typo-tolerant, and integrates with Laravel Scout in minutes.
 
 ## The Component
 
 ```php
 <?php
 
-namespace App\Http\Livewire;
+namespace App\Livewire;
 
-use App\Models\Client;
-use App\Models\Instruction;
+use App\Models\Customer;
+use App\Models\Project;
 use Livewire\Component;
-use Illuminate\Support\Str;
 
 class GlobalSearch extends Component
 {
     public string $search = '';
     public array $results = [];
-    public array $searchable = [];
 
-    protected array $rules = [
-        'search' => 'required|min:3',
-    ];
-
-    public function mount()
+    public function updatedSearch(): void
     {
-        // Configure which models to search and which fields
-        $this->searchable = [
-            Client::class => ['company_name'],
-            Instruction::class => ['title'],
+        if (strlen($this->search) < 3) {
+            $this->results = [];
+            return;
+        }
+
+        $this->results = [
+            'customers' => Customer::where('name', 'like', "%{$this->search}%")
+                ->orWhere('email', 'like', "%{$this->search}%")
+                ->take(5)
+                ->get(),
+            'projects' => Project::where('title', 'like', "%{$this->search}%")
+                ->take(5)
+                ->get(),
         ];
     }
 
-    public function updatedSearch()
-    {
-        $this->reset('results');
-        
-        // Don't search until we have 3 characters
-        $this->validateOnly('search');
-        
-        $this->getSearchResults();
-    }
-
-    public function resetForm()
+    public function resetForm(): void
     {
         $this->reset(['search', 'results']);
-    }
-
-    public function getSearchResults()
-    {
-        foreach ($this->searchable as $model => $columns) {
-            // Create a readable key from the model name
-            $modelKey = Str::camel(class_basename($model));  // "Client" → "client"
-
-            $query = (new $model())->query();
-
-            // Search each configured column
-            foreach ($columns as $column) {
-                $query->orWhere($column, 'LIKE', '%' . $this->search . '%');
-            }
-
-            $queryResults = $query->take(5)->get();
-
-            if ($queryResults->isNotEmpty()) {
-                $this->results[$modelKey] = $queryResults->map(function ($resource) use ($columns) {
-                    // Build the result object
-                    $fields = [];
-                    foreach ($columns as $field) {
-                        $fieldKey = Str::ucfirst($field);  // "company_name" → "Company_name"
-                        $fields[$fieldKey] = $resource->{$field};
-                    }
-
-                    // Generate the link
-                    $routeKey = Str::plural(Str::kebab(class_basename($resource)));  // "Client" → "clients"
-
-                    return [
-                        'linkTo' => route($routeKey . '.show', [$resource->uuid]),
-                        'fields' => $fields,
-                    ];
-                });
-            }
-        }
     }
 
     public function render()
@@ -102,13 +61,13 @@ class GlobalSearch extends Component
 ## The Template
 
 ```blade
-<div class="relative" x-data="{ open: @entangle('search').length > 0 }">
+<div class="relative">
     {{-- Search Input --}}
     <div class="relative">
         <input 
             type="text" 
-            wire:model.debounce.300ms="search"
-            placeholder="Search clients, instructions..."
+            wire:model.live.debounce.300ms="search"
+            placeholder="Search customers, projects..."
             class="w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500"
         >
         <svg class="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -130,28 +89,36 @@ class GlobalSearch extends Component
     {{-- Results Dropdown --}}
     @if(count($results) > 0)
         <div class="absolute z-50 w-full mt-2 bg-white rounded-lg shadow-lg border max-h-96 overflow-y-auto">
-            @foreach($results as $modelName => $items)
+            @if(isset($results['customers']) && $results['customers']->isNotEmpty())
                 <div class="p-2">
-                    <h4 class="text-xs font-semibold text-gray-500 uppercase px-2 mb-1">
-                        {{ Str::title(Str::snake($modelName, ' ')) }}
-                    </h4>
-                    
-                    @foreach($items as $item)
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase px-2 mb-1">Customers</h4>
+                    @foreach($results['customers'] as $customer)
                         <a 
-                            href="{{ $item['linkTo'] }}" 
+                            href="{{ route('customers.show', $customer) }}" 
                             class="block px-2 py-2 hover:bg-gray-100 rounded"
                         >
-                            @foreach($item['fields'] as $fieldName => $fieldValue)
-                                <span class="text-gray-900">{{ $fieldValue }}</span>
-                            @endforeach
+                            {{ $customer->name }} · {{ $customer->email }}
                         </a>
                     @endforeach
                 </div>
-                
-                @if(!$loop->last)
+            @endif
+
+            @if(isset($results['projects']) && $results['projects']->isNotEmpty())
+                @if(isset($results['customers']) && $results['customers']->isNotEmpty())
                     <hr class="my-1">
                 @endif
-            @endforeach
+                <div class="p-2">
+                    <h4 class="text-xs font-semibold text-gray-500 uppercase px-2 mb-1">Projects</h4>
+                    @foreach($results['projects'] as $project)
+                        <a 
+                            href="{{ route('projects.show', $project) }}" 
+                            class="block px-2 py-2 hover:bg-gray-100 rounded"
+                        >
+                            {{ $project->title }}
+                        </a>
+                    @endforeach
+                </div>
+            @endif
         </div>
     @elseif(strlen($search) >= 3)
         <div class="absolute z-50 w-full mt-2 bg-white rounded-lg shadow-lg border p-4">
@@ -163,19 +130,9 @@ class GlobalSearch extends Component
 
 ## Key Features
 
-**Debounced input.** The `wire:model.debounce.300ms` directive waits 300ms after the user stops typing before triggering a search. This prevents hammering the database on every keystroke.
+**Debounced input.** The `wire:model.live.debounce.300ms` directive waits 300ms after the user stops typing before triggering a search. This prevents hammering the database on every keystroke.
 
 **Minimum character requirement.** Searches only run with 3+ characters. This avoids overly broad queries.
-
-**Configurable models.** The `$searchable` array defines what gets searched. Adding a new model is one line:
-
-```php
-$this->searchable = [
-    Client::class => ['company_name'],
-    Instruction::class => ['title'],
-    Project::class => ['name', 'description'],  // Search multiple fields
-];
-```
 
 **Limited results.** `take(5)` prevents overwhelming the UI. For a global search, you want quick results, not exhaustive lists.
 
@@ -218,34 +175,45 @@ Now Cmd+K (Mac) or Ctrl+K (Windows) opens a spotlight-style search modal.
 **Add scoping.** Only search records the user can access:
 
 ```php
-$query = (new $model())->query();
-
-// Scope to user's teams
-if ($model === Client::class) {
-    $query->whereIn('team_id', auth()->user()->allTeams()->pluck('id'));
-}
+'customers' => Customer::where('team_id', auth()->user()->team_id)
+    ->where('name', 'like', "%{$this->search}%")
+    ->take(5)
+    ->get(),
 ```
 
-**Include metadata.** Show more context in results:
+**Add more models.** Just add another array key:
 
 ```php
-return [
-    'linkTo' => route($routeKey . '.show', [$resource->uuid]),
-    'fields' => $fields,
-    'subtitle' => $resource->created_at->diffForHumans(),
-    'badge' => $resource->status ?? null,
-];
+'invoices' => Invoice::where('reference_number', 'like', "%{$this->search}%")
+    ->take(5)
+    ->get(),
 ```
 
-**Highlight matches.** Mark the matching text:
+## Testing
 
 ```php
-$highlightedValue = preg_replace(
-    '/(' . preg_quote($this->search, '/') . ')/i',
-    '<mark>$1</mark>',
-    $fieldValue
-);
+use App\Livewire\GlobalSearch;
+use App\Models\Customer;
+use Livewire\Livewire;
+
+it('searches customers by name', function () {
+    Customer::factory()->create(['name' => 'Acme Corporation']);
+    Customer::factory()->create(['name' => 'Beta Industries']);
+
+    Livewire::test(GlobalSearch::class)
+        ->set('search', 'Acme')
+        ->assertSet('results.customers', fn ($results) => 
+            $results->contains(fn ($c) => $c->name === 'Acme Corporation')
+        );
+});
+
+it('requires minimum 3 characters', function () {
+    Customer::factory()->create(['name' => 'Acme Corporation']);
+
+    Livewire::test(GlobalSearch::class)
+        ->set('search', 'Ac')
+        ->assertSet('results', []);
+});
 ```
 
-Global search is one of those features that seems complex but becomes simple with Livewire. A single component, real-time results, no JavaScript to maintain.
-
+That's it. A quick MySQL search that works for small datasets. When you outgrow it, switch to Typesense and Laravel Scout. But for now? Copy, paste, ship.

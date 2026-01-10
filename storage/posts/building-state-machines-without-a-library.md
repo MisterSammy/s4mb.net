@@ -1,38 +1,34 @@
 ---
 title: "Building a State Machine Without a State Machine Library"
 date: 2025-01-09
-excerpt: "You don't always need a package. Sometimes PHP enums and helper classes are all you need to model complex workflows with multiple states, transitions, and role-based actions."
+excerpt: "For simple workflows, PHP enums with transition methods are all you need. But for complex state machines with many states and guards, consider a dedicated package."
 tags: [laravel, php, architecture, enums, workflow]
 slug: building-state-machines-without-a-library
 ---
 
-State machines are everywhere in business applications. Orders move from pending to paid to shipped to delivered. Support tickets escalate from open to in-progress to resolved. User accounts progress through verification steps before becoming active.
+State machines are everywhere in business applications. Orders move from pending to paid to shipped to delivered. Support tickets escalate from open to in-progress to resolved. Vendor applications progress through approval stages before becoming active.
 
 The instinct when facing these requirements is to reach for a state machine package. Laravel has several good ones—`spatie/laravel-model-states`, `asantibanez/laravel-eloquent-state-machines`, and others. They're well-designed and battle-tested.
 
-But sometimes a package is overkill. If your states are relatively simple, your transitions are predictable, and you want to keep your dependencies lean, you can build something elegant with just PHP 8.1 enums and a few helper classes.
+But sometimes a package is overkill. If your workflow is **truly simple**—3-5 states, linear progression, predictable transitions—you can build something elegant with just PHP 8.1 enums. This post shows you when that makes sense, and when to reach for a package instead.
 
-This post walks through a pattern I used for a client onboarding platform where entities moved through multiple verification stages. The system needed to track where each client was in the process, determine what actions were valid at each stage, and show different UI guidance to different user roles.
+## The Simple Case: Food Truck Festival Vendor Applications
 
-## The Problem
+Consider a food truck festival where vendors submit applications that move through a straightforward approval process:
 
-Consider a client onboarding workflow with these states:
+1. **Application Submitted** — Vendor applied to participate
+2. **Health Inspection** — Health department reviews permits
+3. **Insurance Review** — Festival organizers verify insurance
+4. **Approved** — Ready to participate
+5. **Rejected** — Application denied (from any stage)
 
-1. **Conflict Checks** — Initial screening for conflicts of interest
-2. **Risk Assessment** — Evaluating the client's risk profile
-3. **AML Verification** — Anti-money laundering identity checks
-4. **Active** — Fully onboarded and ready to work with
+This workflow has a few key properties that make it a good candidate for a simple enum-based approach:
+- Small number of states (5 total)
+- Mostly linear progression
+- Predictable transitions
+- No complex guards or async checks
 
-Plus several rejection states when things go wrong:
-
-5. **Rejected (Conflict Checks)** — Failed the conflict screening
-6. **Rejected (Risk Assessment)** — Too risky to proceed
-7. **Rejected (AML Verification)** — Identity verification failed
-8. **Rejected (Denied)** — Manually denied by staff
-
-Each state has rules about what actions are valid. You can't create instructions for a client still in conflict checks. You can't skip verification unless you're an approving director. The UI needs to show different guidance depending on whether you're staff or the client themselves.
-
-A state machine package could handle this, but let's see how far we get with native PHP.
+For this use case, an enum with transition validation is sufficient:
 
 ## Defining States with Enums
 
@@ -43,29 +39,23 @@ PHP 8.1 introduced backed enums, which are perfect for representing states. Each
 
 namespace App\Enums;
 
-enum ClientStatus: int
+enum VendorStatus: int
 {
-    case CONFLICT_CHECKS = 1;
-    case RISK_ASSESSMENT = 2;
-    case AML_VERIFICATION = 3;
-    case ACTIVE = 4;
-    case REJECTED_CONFLICT_CHECKS = 5;
-    case REJECTED_RISK_ASSESSMENT = 6;
-    case REJECTED_AML_VERIFICATION = 7;
-    case REJECTED_DENIED = 8;
+    case APPLICATION_SUBMITTED = 1;
+    case HEALTH_INSPECTION = 2;
+    case INSURANCE_REVIEW = 3;
+    case APPROVED = 4;
+    case REJECTED = 5;
 
     // Human-readable names for display
     public function getName(): string
     {
         return match($this) {
-            self::CONFLICT_CHECKS => 'Conflict Checks',
-            self::RISK_ASSESSMENT => 'Risk Assessment',
-            self::AML_VERIFICATION => 'AML Verification',
-            self::ACTIVE => 'Active',
-            self::REJECTED_CONFLICT_CHECKS => 'Rejected (Conflict Checks)',
-            self::REJECTED_RISK_ASSESSMENT => 'Rejected (Risk Assessment)',
-            self::REJECTED_AML_VERIFICATION => 'Rejected (AML Verification)',
-            self::REJECTED_DENIED => 'Rejected (Denied)',
+            self::APPLICATION_SUBMITTED => 'Application Submitted',
+            self::HEALTH_INSPECTION => 'Health Inspection',
+            self::INSURANCE_REVIEW => 'Insurance Review',
+            self::APPROVED => 'Approved',
+            self::REJECTED => 'Rejected',
         };
     }
 
@@ -73,14 +63,11 @@ enum ClientStatus: int
     public function getStyles(): string
     {
         return match($this) {
-            self::CONFLICT_CHECKS => 'bg-red-200',
-            self::RISK_ASSESSMENT => 'bg-yellow-200',
-            self::AML_VERIFICATION => 'bg-green-200',
-            self::ACTIVE => 'bg-blue-200',
-            self::REJECTED_CONFLICT_CHECKS => 'bg-purple-200',
-            self::REJECTED_RISK_ASSESSMENT => 'bg-orange-200',
-            self::REJECTED_AML_VERIFICATION => 'bg-pink-200',
-            self::REJECTED_DENIED => 'bg-orange-200',
+            self::APPLICATION_SUBMITTED => 'bg-gray-200',
+            self::HEALTH_INSPECTION => 'bg-yellow-200',
+            self::INSURANCE_REVIEW => 'bg-blue-200',
+            self::APPROVED => 'bg-green-200',
+            self::REJECTED => 'bg-red-200',
         };
     }
 }
@@ -90,341 +77,278 @@ This gives you several benefits immediately:
 
 **Type safety.** The `status` property on your model can only be one of these values. No typos, no invalid states.
 
-**IDE support.** Autocompletion shows you all possible states when you type `ClientStatus::`.
+**IDE support.** Autocompletion shows you all possible states when you type `VendorStatus::`.
 
 **Single source of truth.** Display names and styling are defined once, alongside the state definitions.
 
 **Database efficiency.** The integer backing means your `status` column is a tiny `TINYINT` rather than a string.
 
-In your model, you store and retrieve the integer value:
+In your model, you store and retrieve the integer value. Use Laravel's `casts()` method to automatically convert:
+
+```php
+<?php
+
+namespace App\Models;
+
+use App\Enums\VendorStatus;
+use Illuminate\Database\Eloquent\Model;
+
+class Vendor extends Model
+{
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'status' => VendorStatus::class,
+        ];
+    }
+}
+```
+
+Now you can work with the enum directly:
 
 ```php
 // Storing a status
-$client->status = ClientStatus::RISK_ASSESSMENT->value;
+$vendor->status = VendorStatus::HEALTH_INSPECTION;
 
-// Reading a status (convert int back to enum)
-$status = ClientStatus::tryFrom($client->status);
-echo $status->getName(); // "Risk Assessment"
+// Reading a status (automatically cast to enum)
+echo $vendor->status->getName(); // "Health Inspection"
+
+// Comparing
+if ($vendor->status === VendorStatus::APPROVED) {
+    // ...
+}
 ```
 
-The `tryFrom()` method returns `null` if the integer doesn't match any case, which is safer than `from()` which throws an exception.
+## Transition Validation
 
-## The Status Evaluator Pattern
-
-Now comes the interesting part: determining what actions are valid for each state. You could put this logic in the model, but that leads to bloated models with dozens of methods. Instead, create a dedicated evaluator class:
+The key to a simple state machine is preventing invalid transitions. Add transition validation directly to the enum:
 
 ```php
-<?php
-
-namespace App\Helpers;
-
-use App\Enums\ClientStatus;
-use Illuminate\Support\Facades\Auth;
-
-class ClientStatusEvaluator
+enum VendorStatus: int
 {
-    public static function canDeleteClient($status): bool
+    case APPLICATION_SUBMITTED = 1;
+    case HEALTH_INSPECTION = 2;
+    case INSURANCE_REVIEW = 3;
+    case APPROVED = 4;
+    case REJECTED = 5;
+
+    public function getName(): string { /* ... */ }
+    public function getStyles(): string { /* ... */ }
+
+    /**
+     * Check if this state can transition to the given state.
+     */
+    public function canTransitionTo(self $newState): bool
     {
-        // Can only delete clients in rejected states
-        return match ($status) {
-            ClientStatus::REJECTED_CONFLICT_CHECKS->value,
-            ClientStatus::REJECTED_RISK_ASSESSMENT->value,
-            ClientStatus::REJECTED_AML_VERIFICATION->value => true,
+        return match([$this, $newState]) {
+            // Application can move to health inspection
+            [self::APPLICATION_SUBMITTED, self::HEALTH_INSPECTION],
+            // Health inspection can move to insurance review or rejection
+            [self::HEALTH_INSPECTION, self::INSURANCE_REVIEW],
+            [self::HEALTH_INSPECTION, self::REJECTED],
+            // Insurance review can move to approved or rejection
+            [self::INSURANCE_REVIEW, self::APPROVED],
+            [self::INSURANCE_REVIEW, self::REJECTED],
+            // Can reject from any active state
+            [self::APPLICATION_SUBMITTED, self::REJECTED],
+            // Terminal states: can't transition from approved or rejected
             default => false,
         };
     }
 
-    public static function canSkipVerification($status): bool
+    /**
+     * Transition to a new state, throwing an exception if invalid.
+     */
+    public function transitionTo(self $newState): self
     {
-        // Only approving directors can skip, and only during AML stage
-        if (!Auth::user()->isApprovingDirector) {
-            return false;
+        if (!$this->canTransitionTo($newState)) {
+            throw new \InvalidArgumentException(
+                "Cannot transition from {$this->getName()} to {$newState->getName()}"
+            );
         }
-        
-        return $status === ClientStatus::AML_VERIFICATION->value;
-    }
-
-    public static function canSetActiveClient($status): bool
-    {
-        // Can only activate from AML verification stage
-        return $status === ClientStatus::AML_VERIFICATION->value;
-    }
-
-    public static function canCreateInstructions($status): bool
-    {
-        // Can create instructions in any state except initial conflict checks
-        return $status !== ClientStatus::CONFLICT_CHECKS->value;
-    }
-
-    public static function canCreateVerification($status): bool
-    {
-        return $status === ClientStatus::AML_VERIFICATION->value;
-    }
-
-    public static function canReadVerification($status): bool
-    {
-        return match ($status) {
-            ClientStatus::AML_VERIFICATION->value,
-            ClientStatus::ACTIVE->value,
-            ClientStatus::REJECTED_CONFLICT_CHECKS->value,
-            ClientStatus::REJECTED_RISK_ASSESSMENT->value,
-            ClientStatus::REJECTED_AML_VERIFICATION->value => true,
-            default => false,
-        };
+        return $newState;
     }
 }
 ```
 
-The pattern is simple: static methods that take a status value and return a boolean. Some methods check only the status, others also check the current user's role.
-
-In your controllers and Livewire components, use the evaluator before performing actions:
+Now your model can enforce valid transitions:
 
 ```php
-public function setActive(Client $client)
+// In your controller or service
+public function advanceStatus(Vendor $vendor, VendorStatus $newStatus): void
 {
-    if (!Auth::user()->hasPermission('client:set-active')) {
+    if (!$vendor->status->canTransitionTo($newStatus)) {
+        abort(400, 'Invalid status transition');
+    }
+
+    $vendor->status = $newStatus;
+    $vendor->save();
+}
+```
+
+Or use the enum's transition method:
+
+```php
+try {
+    $vendor->status = $vendor->status->transitionTo(VendorStatus::APPROVED);
+    $vendor->save();
+} catch (\InvalidArgumentException $e) {
+    // Handle invalid transition
+}
+```
+
+## Checking Permissions by State
+
+You can add permission checks directly to the enum as well:
+
+```php
+enum VendorStatus: int
+{
+    // ... cases ...
+
+    /**
+     * Can a festival coordinator perform actions on vendors in this state?
+     */
+    public function canCoordinatorManage(): bool
+    {
+        return match($this) {
+            self::APPLICATION_SUBMITTED,
+            self::HEALTH_INSPECTION,
+            self::INSURANCE_REVIEW => true,
+            self::APPROVED,
+            self::REJECTED => false, // Terminal states
+        };
+    }
+
+    /**
+     * Can a vendor view their application in this state?
+     */
+    public function canVendorView(): bool
+    {
+        return true; // Vendors can always view their application
+    }
+}
+```
+
+In your controllers:
+
+```php
+public function update(Vendor $vendor)
+{
+    // Check authorization (permissions/roles)
+    if (!auth()->user()->hasPermission('vendor:update')) {
         abort(403);
     }
-    
-    if (!ClientStatusEvaluator::canSetActiveClient($client->status)) {
-        abort(400, 'Cannot activate client from current status');
+
+    // Check state-based permissions
+    if (!$vendor->status->canCoordinatorManage()) {
+        abort(400, 'Cannot modify vendor in current status');
     }
 
-    $client->status = ClientStatus::ACTIVE->value;
-    $client->save();
-
-    return redirect()->back();
+    // Proceed with update
 }
 ```
-
-This keeps your authorization logic (`hasPermission`) separate from your state transition logic (`canSetActiveClient`). Both must pass for the action to proceed.
 
 ## Automatic State Transitions
 
-Some state changes should happen automatically when related records are created. For example, when a conflict check is submitted and passes, the client should automatically advance to the risk assessment stage.
+Some state changes should happen automatically when related records are created. For example, when a health inspection passes, the vendor should automatically advance to the insurance review stage.
 
-In a Livewire component that handles conflict check creation:
+In a Livewire component that handles health inspection results:
 
 ```php
-public function submit()
+public function submitHealthInspection(): void
 {
-    $client = Client::findOrFail($this->client_id);
+    $vendor = Vendor::findOrFail($this->vendor_id);
     
-    if (!Auth::user()->hasPermission('client-conflict-check:create')) {
+    if (!auth()->user()->hasPermission('vendor:health-inspection')) {
         abort(403);
     }
 
-    $conflictCheck = ClientConflictCheck::create([
-        'client_id' => $client->id,
-        'user_id' => Auth::user()->id,
-        'status' => $this->form->getState()['status']
+    $inspection = HealthInspection::create([
+        'vendor_id' => $vendor->id,
+        'inspector_id' => auth()->id(),
+        'passed' => $this->passed,
     ]);
 
     // Automatic state transition based on outcome
-    if ($conflictCheck->status === 'conflicts_found') {
-        $client->status = ClientStatus::REJECTED_CONFLICT_CHECKS->value;
+    if ($this->passed) {
+        $vendor->status = $vendor->status->transitionTo(VendorStatus::INSURANCE_REVIEW);
     } else {
-        $client->status = ClientStatus::RISK_ASSESSMENT->value;
+        $vendor->status = $vendor->status->transitionTo(VendorStatus::REJECTED);
     }
 
-    $client->save();
+    $vendor->save();
     
-    $this->emit('refreshClient');
-    $this->closeModal();
+    $this->dispatch('vendor-updated');
 }
 ```
 
-The state machine logic lives right where the action happens. When a conflict check is created, the system immediately determines the next state based on the outcome. No need to remember to update the client status separately.
+The state machine logic lives right where the action happens. When an inspection completes, the system immediately determines the next state based on the outcome.
 
-## The Next Step Helper
+## When This Simple Pattern Works Well
 
-Different users need different guidance at each stage. Staff members need to know what action to take next. Clients need to understand what's happening with their application.
+This enum-based approach works well when:
 
-A helper class with a large configuration array handles this elegantly:
+**States are few (3-8).** Beyond that, the `match` statements become unwieldy.
 
-```php
-<?php
+**Transitions are predictable.** The workflow follows a mostly linear path with some branches.
 
-namespace App\Helpers;
+**No complex guards.** Transitions don't depend on multiple conditions, async checks, or external service calls.
 
-class NextStepHelper
-{
-    const CLIENT_SETUP_MESSAGE = "We're getting your account set up. You can leave a message on the Discussion tab and your adviser will be in touch.";
+**No transition history needed.** You don't need to audit who changed states when (though you can still log this separately).
 
-    const VALUES = [
-        'App\Models\Client' => [
-            'adviser' => [
-                1 => [ // CONFLICT_CHECKS
-                    'message' => "Nice one, you've added a new Client! Next step, do a conflict check:",
-                    'link' => '<button onclick="...">Create Conflict Check</button>',
-                ],
-                2 => [ // RISK_ASSESSMENT
-                    'message' => "There were no conflicts flagged. Now complete a Risk Assessment:",
-                    'link' => '<button onclick="...">Add Risk Assessment</button>',
-                ],
-                3 => [ // AML_VERIFICATION
-                    'message' => "Request AML Verification for each relevant person. When complete, click proceed.",
-                    'link' => '<button onclick="...">Set Client Active</button>',
-                ],
-                4 => [ // ACTIVE
-                    'message' => "The client is fully onboarded. Create an instruction to start work:",
-                    'link' => '<button onclick="...">Add Instruction</button>',
-                ],
-                // ... rejection states with recovery guidance
-            ],
-            'account-holder' => [
-                1 => [ // CONFLICT_CHECKS
-                    'message' => self::CLIENT_SETUP_MESSAGE,
-                    'link' => '',
-                ],
-                2 => [ // RISK_ASSESSMENT  
-                    'message' => self::CLIENT_SETUP_MESSAGE,
-                    'link' => '',
-                ],
-                3 => [ // AML_VERIFICATION
-                    'message' => "We need to verify your identity. Click here to start:",
-                    'link' => '<a href="/verify-user"><button>Complete Verification</button></a>',
-                ],
-                4 => [ // ACTIVE
-                    'message' => "Your account is active. Check the Instructions tab to see work in progress.",
-                    'link' => '',
-                ],
-            ],
-        ],
-    ];
-}
-```
-
-The structure is `[Model][Role][Status]`. In your Blade views, look up the appropriate message:
-
-```blade
-@php
-    $role = Auth::user()->hasRole('adviser') ? 'adviser' : 'account-holder';
-    $nextStep = App\Helpers\NextStepHelper::VALUES['App\Models\Client'][$role][$client->status] ?? null;
-@endphp
-
-@if($nextStep)
-    <div class="next-step-card">
-        <p>{{ $nextStep['message'] }}</p>
-        {!! $nextStep['link'] !!}
-    </div>
-@endif
-```
-
-Staff see actionable guidance with buttons to perform the next step. Clients see friendly status messages. The same component renders different content based on who's viewing it.
-
-## Visual Checklists
-
-For workflows with many steps, a checklist provides at-a-glance progress indication. Another helper class generates the checklist based on current state:
-
-```php
-<?php
-
-namespace App\Helpers;
-
-use App\Enums\ClientStatus;
-use App\Models\Client;
-
-class ChecklistHelper
-{
-    public static function getClientChecklist(Client $client): array
-    {
-        $checklist = [];
-
-        if ($client->status == ClientStatus::CONFLICT_CHECKS->value) {
-            $checklist = [
-                ['icon' => '⬜️', 'message' => 'Complete a Conflict Checks form'],
-                ['icon' => '⬜️', 'message' => 'Complete a Risk Assessment form'],
-                ['icon' => '⬜️', 'message' => 'Request AML Verification'],
-                ['icon' => '⬜️', 'message' => 'Active'],
-            ];
-        }
-
-        if ($client->status == ClientStatus::RISK_ASSESSMENT->value) {
-            $checklist = [
-                ['icon' => '✅', 'message' => 'Complete a Conflict Checks form'],
-                ['icon' => '⬜️', 'message' => 'Complete a Risk Assessment form'],
-                ['icon' => '⬜️', 'message' => 'Request AML Verification'],
-                ['icon' => '⬜️', 'message' => 'Active'],
-            ];
-        }
-
-        if ($client->status == ClientStatus::ACTIVE->value) {
-            $checklist = [
-                ['icon' => '✅', 'message' => 'Complete a Conflict Checks form'],
-                ['icon' => '✅', 'message' => 'Complete a Risk Assessment form'],
-                ['icon' => '✅', 'message' => 'Request AML Verification'],
-                ['icon' => '✅', 'message' => 'Active'],
-            ];
-        }
-
-        // Handle rejection states by inserting failure indicators
-        if ($client->status == ClientStatus::REJECTED_CONFLICT_CHECKS->value) {
-            $checklist = [
-                ['icon' => '✅', 'message' => 'Complete a Conflict Checks form'],
-                ['icon' => '❌', 'message' => 'Failed Conflict Checks'],
-                ['icon' => '⬜️', 'message' => 'Complete a Risk Assessment form'],
-                ['icon' => '⬜️', 'message' => 'Request AML Verification'],
-                ['icon' => '⬜️', 'message' => 'Active'],
-            ];
-        }
-
-        return $checklist;
-    }
-}
-```
-
-Pass the checklist to your view:
-
-```php
-return view('clients.show', [
-    'client' => $client,
-    'checklist' => ChecklistHelper::getClientChecklist($client),
-]);
-```
-
-Render it with a simple loop:
-
-```blade
-<ul class="space-y-2">
-    @foreach($checklist as $item)
-        <li class="flex items-center gap-2">
-            <span>{{ $item['icon'] }}</span>
-            <span>{{ $item['message'] }}</span>
-        </li>
-    @endforeach
-</ul>
-```
-
-## When to Use This Pattern
-
-This approach works well when:
-
-**States are relatively few.** Eight to fifteen states is manageable. Beyond that, the helper classes become unwieldy.
-
-**Transitions are predictable.** The workflow follows a mostly linear path with some branches for rejections.
-
-**You want minimal dependencies.** No packages to update, no breaking changes to navigate.
-
-**The logic is domain-specific.** State machine packages are generic. Your helper classes can encode business rules directly.
+**Minimal dependencies.** You want to avoid external packages for simple workflows.
 
 ## When to Reach for a Package
 
-Consider a dedicated state machine package when:
+Now consider a more complex workflow—a vendor application system for a large multi-day festival:
 
-**States number in the dozens.** Configuration files or database-driven states become more practical.
+- **10+ states:** Application → Initial Review → Background Check → Health Permit → Insurance → Fire Safety → Capacity Review → Payment → Final Approval → Active → Suspended → Rejected (from multiple stages)
+- **Role-based transitions:** Only festival coordinators can approve, but vendors can submit documents
+- **Time-based guards:** Applications auto-reject if not completed within 30 days
+- **Transition history:** Need to audit all state changes for compliance
+- **Side effects:** State changes trigger webhooks, notifications, and external API calls
 
-**Transitions have complex guards.** Multiple conditions, async checks, or external service calls.
+For this complexity, a dedicated state machine package like `spatie/laravel-model-states` is the right choice:
 
-**You need transition history.** Packages often include audit logging of state changes.
+```php
+use Spatie\ModelStates\State;
+use Spatie\ModelStates\StateConfig;
 
-**Multiple developers need to understand the system.** Packages come with documentation and established patterns.
+abstract class VendorApplicationState extends State
+{
+    public static function config(): StateConfig
+    {
+        return parent::config()
+            ->default(ApplicationSubmitted::class)
+            ->allowTransition(ApplicationSubmitted::class, HealthInspection::class)
+            ->allowTransition(HealthInspection::class, InsuranceReview::class, [
+                HealthInspectionPassedGuard::class,
+            ])
+            ->allowTransition(InsuranceReview::class, Approved::class, [
+                InsuranceVerifiedGuard::class,
+                PaymentCompletedGuard::class,
+            ]);
+    }
+}
+```
+
+Packages provide:
+- **Transition history** with automatic audit logging
+- **Guard classes** for complex validation logic
+- **Event hooks** for side effects (notifications, webhooks)
+- **Better tooling** for debugging and visualization
+- **Documentation** and established patterns
 
 ## Conclusion
 
-Not every workflow needs a state machine library. PHP 8.1 enums provide type-safe state definitions with attached behavior. Helper classes organize transition logic and role-based guidance. Automatic transitions in your action handlers keep related logic together.
+For truly simple workflows with 3-8 states and predictable transitions, PHP enums with transition validation are elegant and sufficient. They provide type safety, IDE support, and enforce valid transitions—all without external dependencies.
 
-The result is a system that's easy to understand, easy to modify, and has zero external dependencies. For many applications, that's exactly the right trade-off.
+But as complexity grows—more states, complex guards, transition history, multiple roles—a dedicated state machine package becomes the pragmatic choice. The enum approach works until it doesn't, and you'll know when you've outgrown it.
 
-The pattern scales down beautifully too. Even a simple "draft → published → archived" workflow benefits from an enum with display names and a helper that checks whether publishing is allowed. Start simple, and you'll know when you've outgrown it.
-
+Start simple. If your workflow stays simple, the enum approach will serve you well. If it grows complex, you'll appreciate having a battle-tested package to handle the edge cases.

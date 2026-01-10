@@ -1,23 +1,23 @@
 ---
 title: "Scheduled Jobs for Business Logic: Automatic Expiration and Reminder Systems"
 date: 2025-01-09
-excerpt: "Not everything happens on user interaction. Here's how to build scheduled jobs that enforce business rules like document expiration and reminder emails."
+excerpt: "Not everything happens on user interaction. Here's how to build scheduled jobs that enforce business rules like rental expiration and reminder emails."
 tags: [laravel, scheduling, jobs, automation, business-logic]
 slug: scheduled-jobs-business-logic-laravel
 ---
 
-Some business rules can't wait for user interaction. Documents expire after 14 days. Reminders need to go out 2 days before deadlines. Inactive accounts should be flagged automatically.
+Some business rules can't wait for user interaction. Equipment rentals expire after 14 days. Reminders need to go out 2 days before deadlines. Inactive accounts should be flagged automatically.
 
 Laravel's task scheduler handles these time-based rules elegantly. Instead of building a separate cron infrastructure, you define scheduled tasks in PHP and let a single cron entry run them.
 
-This post walks through two related scheduled jobs: one that sends reminders before expiration, and one that actually expires documents when the deadline passes.
+This post walks through two related scheduled jobs: one that sends reminders before expiration, and one that actually expires rentals when the deadline passes.
 
 ## The Business Rule
 
-Consider this workflow: when a document is sent to a client for review, they have 14 days to respond. If they don't:
+Consider this workflow: when equipment is sent out for a rental, the customer has 14 days to return it. If they don't:
 
-1. At day 12, send a reminder that expiration is approaching
-2. At day 14, mark the document as expired and notify relevant parties
+1. At day 12, send a reminder that the return deadline is approaching
+2. At day 14, mark the rental as overdue and notify relevant parties
 
 Both actions happen automatically, without any user triggering them.
 
@@ -25,102 +25,99 @@ Both actions happen automatically, without any user triggering them.
 
 The challenge is knowing when the 14-day clock started. If you only store the current status, you don't know when it changed.
 
-One solution: use your activity log. If you're logging status changes (which you should be for audit purposes), you can query the log to find when a document entered the "pending review" state:
+**The Right Way: Dedicated Timestamp Columns**
+
+While it might seem convenient to derive timing from activity logs, that approach has significant problems:
+
+- **Fragile string matching:** Log messages can change format, breaking your queries
+- **Performance issues:** Full-text searches on log content don't scale
+- **Unclear intent:** Business logic buried in observability data
+- **Missed runs:** If the scheduled job misses a day, `== 14` matching fails
+
+Instead, use dedicated timestamp columns that explicitly track business events:
 
 ```php
-use App\Models\Log;
-use Illuminate\Support\Carbon;
-
-$log = Log::where('loggable_id', $instruction->id)
-    ->where('loggable_type', 'App\\Models\\Instruction')
-    ->where('content', 'The instruction status changed to Instruction Form (Client Review)')
-    ->latest()
-    ->first();
-
-if ($log) {
-    $daysSinceStatusChange = Carbon::parse($log->created_at)->diffInDays(Carbon::now());
-}
+// Migration
+Schema::table('rentals', function (Blueprint $table) {
+    $table->timestamp('rented_at')->nullable();
+    $table->timestamp('expires_at')->nullable();
+    $table->timestamp('reminder_sent_at')->nullable();
+    $table->index('expires_at'); // Index for efficient queries
+});
 ```
 
-This approach has a nice property: the log is your source of truth for timing, and it already exists for audit purposes.
+Set these timestamps when the status changes:
+
+```php
+$rental->status = RentalStatus::RENTED->value;
+$rental->rented_at = now();
+$rental->expires_at = now()->addDays(14);
+$rental->save();
+```
+
+Now your scheduled jobs can query efficiently with indexed columns, and the business intent is crystal clear.
 
 ## The Expiration Command
 
-Create an Artisan command that finds and expires overdue documents:
+Create an Artisan command that finds and expires overdue rentals:
 
 ```php
 <?php
 
 namespace App\Console\Commands;
 
-use App\Enums\InstructionStatus;
-use App\Models\Instruction;
-use App\Models\Log;
-use App\Notifications\Instruction\InstructionExpiredNotification;
+use App\Enums\RentalStatus;
+use App\Models\Rental;
+use App\Notifications\Rental\RentalOverdueNotification;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Notification;
 
-class ExpireInstructions extends Command
+class ExpireRentals extends Command
 {
-    protected $signature = 'expire_instructions';
-    protected $description = 'Finds instructions pending for 14+ days and sets them to expired.';
+    protected $signature = 'rentals:expire';
+    protected $description = 'Marks rentals as overdue when the return deadline has passed.';
 
-    public function handle()
+    public function handle(): int
     {
-        // Find all instructions waiting for client review
-        // Exclude old migrated data (created before the system went live)
-        $instructionsToCheck = Instruction::where('status', InstructionStatus::INSTRUCTION_FORM_CLIENT_REVIEW->value)
-            ->where('created_at', '>', '2022-12-01')
+        // Find all rentals that are still marked as rented but have passed their expiration date
+        // Using whereDate with <= ensures we catch any rentals that expired today or earlier
+        $overdueRentals = Rental::where('status', RentalStatus::RENTED->value)
+            ->whereNotNull('expires_at')
+            ->whereDate('expires_at', '<=', now())
             ->get();
 
         $expiredCount = 0;
 
-        foreach ($instructionsToCheck as $instruction) {
-            // Find when this instruction entered client review status
-            $log = Log::where('loggable_id', $instruction->id)
-                ->where('loggable_type', 'App\\Models\\Instruction')
-                ->where('content', 'The instruction status changed to Instruction Form (Client Review)')
-                ->latest()
-                ->first();
+        foreach ($overdueRentals as $rental) {
+            // Notify the customer who rented the equipment
+            $rental->customer->notify(new RentalOverdueNotification($rental));
 
-            if (!$log) {
-                continue; // No log entry found, skip
+            // Also notify staff members who manage this rental
+            foreach ($rental->assignedStaff as $staff) {
+                $staff->notify(new RentalOverdueNotification($rental));
             }
 
-            $daysSinceReview = Carbon::parse($log->created_at)->diffInDays(Carbon::now());
-
-            // Exactly 14 days? Time to expire.
-            if ($daysSinceReview == 14) {
-                // Notify account holders
-                foreach ($instruction->client->team->users as $user) {
-                    if ($user->getRole() == 'account-holder') {
-                        $user->notify(new InstructionExpiredNotification($instruction));
-                    }
-                }
-
-                // Update status
-                $instruction->status = InstructionStatus::EXPIRED->value;
-                $instruction->save();
-                
-                $expiredCount++;
-            }
+            // Update status
+            $rental->status = RentalStatus::OVERDUE->value;
+            $rental->save();
+            
+            $expiredCount++;
         }
 
-        $this->info("{$expiredCount} instructions expired.");
+        $this->info("{$expiredCount} rentals marked as overdue.");
 
         return Command::SUCCESS;
     }
 }
 ```
 
-A few things to note:
+Key improvements:
 
-**Exact day matching.** We check for `== 14`, not `>= 14`. This prevents re-processing documents on day 15, 16, etc. The job runs hourly, so it will catch documents on their expiration day.
+**Robust date matching.** Using `whereDate('expires_at', '<=', now())` catches all overdue rentals, even if the job missed running yesterday. No fragile `== 14` exact matching.
 
-**Filtering old data.** The `created_at` filter excludes data migrated from a previous system. Those records don't have proper log entries for timing.
+**Indexed queries.** The `expires_at` column is indexed, so this query scales efficiently even with thousands of rentals.
 
-**User-specific notifications.** Only account holders get the expiration notice—they're the ones who need to take action.
+**Clear business logic.** The timestamps explicitly track when rentals were sent out and when they expire. No need to parse log messages.
 
 ## The Reminder Command
 
@@ -131,94 +128,61 @@ A similar command sends warnings before expiration:
 
 namespace App\Console\Commands;
 
-use App\Enums\InstructionStatus;
-use App\Models\Instruction;
-use App\Models\Log;
-use App\Notifications\Instruction\InstructionAboutToExpireNotification;
+use App\Enums\RentalStatus;
+use App\Models\Rental;
+use App\Notifications\Rental\RentalExpiringSoonNotification;
 use Illuminate\Console\Command;
-use Illuminate\Support\Carbon;
-use Illuminate\Support\Facades\Notification;
 
-class GenerateInstructionExpiryWarnings extends Command
+class SendRentalReminders extends Command
 {
-    protected $signature = 'generate_instruction_expiry_warnings';
-    protected $description = 'Sends reminder emails for instructions expiring in 2 days.';
+    protected $signature = 'rentals:send-reminders';
+    protected $description = 'Sends reminder emails for rentals expiring in 2 days.';
 
-    public function handle()
+    public function handle(): int
     {
-        // Find instructions pending review that haven't been reminded yet
-        $instructionsToCheck = Instruction::where('status', InstructionStatus::INSTRUCTION_FORM_CLIENT_REVIEW->value)
-            ->where('created_at', '>', '2022-12-01')
-            ->whereNull('reminder_sent_at')  // Haven't sent a reminder yet
+        // Find rentals that expire in 2 days and haven't been reminded yet
+        $twoDaysFromNow = now()->addDays(2)->startOfDay();
+        $endOfTwoDays = now()->addDays(2)->endOfDay();
+
+        $rentalsToRemind = Rental::where('status', RentalStatus::RENTED->value)
+            ->whereNotNull('expires_at')
+            ->whereBetween('expires_at', [$twoDaysFromNow, $endOfTwoDays])
+            ->whereNull('reminder_sent_at') // Haven't sent a reminder yet
             ->get();
 
         $reminderCount = 0;
 
-        foreach ($instructionsToCheck as $instruction) {
-            $log = Log::where('loggable_id', $instruction->id)
-                ->where('loggable_type', 'App\\Models\\Instruction')
-                ->where('content', 'The instruction status changed to Instruction Form (Client Review)')
-                ->latest()
-                ->first();
+        foreach ($rentalsToRemind as $rental) {
+            $rental->customer->notify(new RentalExpiringSoonNotification($rental));
 
-            if (!$log) {
-                continue;
-            }
-
-            $daysSinceReview = Carbon::parse($log->created_at)->diffInDays(Carbon::now());
-
-            // Day 12 = 2 days before expiration
-            if ($daysSinceReview == 12) {
-                foreach ($instruction->client->team->users as $user) {
-                    if ($user->getRole() == 'account-holder') {
-                        $user->notify(new InstructionAboutToExpireNotification($instruction));
-                    }
-                }
-
-                // Mark that we've sent the reminder
-                $instruction->reminder_sent_at = Carbon::now();
-                $instruction->save();
-                
-                $reminderCount++;
-            }
+            // Mark that we've sent the reminder
+            $rental->reminder_sent_at = now();
+            $rental->save();
+            
+            $reminderCount++;
         }
 
-        $this->info("{$reminderCount} expiry warnings sent.");
+        $this->info("{$reminderCount} reminders sent.");
 
         return Command::SUCCESS;
     }
 }
 ```
 
-The key addition here is `reminder_sent_at`. This prevents sending multiple reminders if the job runs again before the document expires. Once reminded, the instruction won't appear in subsequent queries.
+The `reminder_sent_at` column ensures idempotency—even if the job runs multiple times on the same day, each rental only gets one reminder.
 
 ## Scheduling the Commands
 
-Register both commands in your console kernel:
+In Laravel 12, scheduled tasks are defined in `routes/console.php` rather than the `Kernel` class:
 
 ```php
 <?php
 
-namespace App\Console;
+use Illuminate\Support\Facades\Schedule;
 
-use Illuminate\Console\Scheduling\Schedule;
-use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
-
-class Kernel extends ConsoleKernel
-{
-    protected function schedule(Schedule $schedule)
-    {
-        // Check for expiring instructions every hour
-        $schedule->command('generate_instruction_expiry_warnings')->hourly();
-        $schedule->command('expire_instructions')->hourly();
-    }
-
-    protected function commands()
-    {
-        $this->load(__DIR__.'/Commands');
-        require base_path('routes/console.php');
-    }
-}
+// Check for expiring rentals every hour
+Schedule::command('rentals:send-reminders')->hourly();
+Schedule::command('rentals:expire')->hourly();
 ```
 
 Hourly runs ensure you catch expirations within a reasonable window. For most business applications, checking every hour is frequent enough without being wasteful.
@@ -235,25 +199,17 @@ This runs every minute, but Laravel's scheduler only executes commands when thei
 
 ## Displaying Time Remaining
 
-Show users how long they have:
+Show users how long they have until expiration:
 
 ```php
-// Instruction.php
-public function getDaysUntilExpiry(): string
+// Rental.php
+public function getDaysUntilExpiry(): int
 {
-    $log = Log::where('loggable_id', $this->id)
-        ->where('loggable_type', 'App\\Models\\Instruction')
-        ->where('content', 'The instruction status changed to Instruction Form (Client Review)')
-        ->latest()
-        ->first();
-
-    if (!$log) {
-        return '';
+    if (!$this->expires_at) {
+        return 0;
     }
 
-    $expiryDate = Carbon::parse($log->created_at)->addDays(14);
-    $daysRemaining = Carbon::now()->diffInDays($expiryDate, false);
-
+    $daysRemaining = now()->diffInDays($this->expires_at, false);
     return max(0, $daysRemaining);
 }
 ```
@@ -261,88 +217,104 @@ public function getDaysUntilExpiry(): string
 In Blade:
 
 ```blade
-@if($instruction->status == InstructionStatus::INSTRUCTION_FORM_CLIENT_REVIEW->value)
+@if($rental->status == RentalStatus::RENTED->value && $rental->expires_at)
     <p class="text-sm text-orange-600">
-        Expires in {{ $instruction->getDaysUntilExpiry() }} days
+        Due back in {{ $rental->getDaysUntilExpiry() }} days
     </p>
 @endif
 ```
 
-## Alternative: Dedicated Timestamp Columns
+## Setting Timestamps When Status Changes
 
-If querying logs feels too indirect, add explicit timestamp columns:
-
-```php
-// Migration
-$table->timestamp('sent_to_client_at')->nullable();
-$table->timestamp('reminder_sent_at')->nullable();
-$table->timestamp('expires_at')->nullable();
-```
-
-Set them when the status changes:
+When a rental's status changes, set the appropriate timestamps:
 
 ```php
-$instruction->status = InstructionStatus::INSTRUCTION_FORM_CLIENT_REVIEW->value;
-$instruction->sent_to_client_at = now();
-$instruction->expires_at = now()->addDays(14);
-$instruction->save();
+// In your controller or service
+public function markAsRented(Rental $rental, int $days = 14): void
+{
+    $rental->status = RentalStatus::RENTED->value;
+    $rental->rented_at = now();
+    $rental->expires_at = now()->addDays($days);
+    $rental->reminder_sent_at = null; // Reset reminder flag
+    $rental->save();
+
+    // Still log the status change for audit purposes
+    activity()
+        ->performedOn($rental)
+        ->log("Rental marked as rented, expires {$rental->expires_at->format('Y-m-d')}");
+}
 ```
 
-Query directly:
-
-```php
-$expiringToday = Instruction::whereDate('expires_at', today())->get();
-```
-
-This approach is more explicit but requires remembering to set the timestamps whenever status changes. The log-based approach derives timing from existing audit data.
+This keeps your audit trail intact while using explicit timestamps for business logic.
 
 ## Testing Scheduled Commands
 
 Test your commands with specific dates:
 
 ```php
-public function test_instructions_expire_after_14_days()
-{
-    // Create an instruction that's been pending for 14 days
-    $instruction = Instruction::factory()->create([
-        'status' => InstructionStatus::INSTRUCTION_FORM_CLIENT_REVIEW->value,
-    ]);
-    
-    Log::create([
-        'loggable_id' => $instruction->id,
-        'loggable_type' => 'App\\Models\\Instruction',
-        'content' => 'The instruction status changed to Instruction Form (Client Review)',
-        'created_at' => now()->subDays(14),
-        'user_id' => 1,
+use App\Enums\RentalStatus;
+use App\Models\Rental;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('marks rentals as overdue after expiration date', function () {
+    $rental = Rental::factory()->create([
+        'status' => RentalStatus::RENTED->value,
+        'expires_at' => now()->subDay(), // Expired yesterday
     ]);
 
-    // Run the expiration command
-    $this->artisan('expire_instructions');
+    $this->artisan('rentals:expire')->assertSuccessful();
 
-    // Verify it expired
-    $instruction->refresh();
-    $this->assertEquals(InstructionStatus::EXPIRED->value, $instruction->status);
-}
+    $rental->refresh();
+    expect($rental->status)->toBe(RentalStatus::OVERDUE->value);
+});
 
-public function test_instructions_not_expired_before_14_days()
-{
-    $instruction = Instruction::factory()->create([
-        'status' => InstructionStatus::INSTRUCTION_FORM_CLIENT_REVIEW->value,
-    ]);
-    
-    Log::create([
-        'loggable_id' => $instruction->id,
-        'loggable_type' => 'App\\Models\\Instruction',
-        'content' => 'The instruction status changed to Instruction Form (Client Review)',
-        'created_at' => now()->subDays(13),  // Only 13 days
-        'user_id' => 1,
+it('does not expire rentals before expiration date', function () {
+    $rental = Rental::factory()->create([
+        'status' => RentalStatus::RENTED->value,
+        'expires_at' => now()->addDay(), // Expires tomorrow
     ]);
 
-    $this->artisan('expire_instructions');
+    $this->artisan('rentals:expire')->assertSuccessful();
 
-    $instruction->refresh();
-    $this->assertEquals(InstructionStatus::INSTRUCTION_FORM_CLIENT_REVIEW->value, $instruction->status);
-}
+    $rental->refresh();
+    expect($rental->status)->toBe(RentalStatus::RENTED->value);
+});
+
+it('sends reminders for rentals expiring in 2 days', function () {
+    $rental = Rental::factory()->create([
+        'status' => RentalStatus::RENTED->value,
+        'expires_at' => now()->addDays(2),
+        'reminder_sent_at' => null,
+    ]);
+
+    Notification::fake();
+
+    $this->artisan('rentals:send-reminders')->assertSuccessful();
+
+    Notification::assertSentTo(
+        $rental->customer,
+        RentalExpiringSoonNotification::class
+    );
+
+    $rental->refresh();
+    expect($rental->reminder_sent_at)->not->toBeNull();
+});
+
+it('does not send duplicate reminders', function () {
+    $rental = Rental::factory()->create([
+        'status' => RentalStatus::RENTED->value,
+        'expires_at' => now()->addDays(2),
+        'reminder_sent_at' => now()->subHour(), // Already reminded
+    ]);
+
+    Notification::fake();
+
+    $this->artisan('rentals:send-reminders')->assertSuccessful();
+
+    Notification::assertNothingSent();
+});
 ```
 
 ## Monitoring
@@ -350,13 +322,23 @@ public function test_instructions_not_expired_before_14_days()
 Add logging to track job execution:
 
 ```php
-public function handle()
+public function handle(): int
 {
-    Log::info('Starting instruction expiration check');
+    \Log::info('Starting rental expiration check');
     
-    // ... job logic ...
+    $overdueRentals = Rental::where('status', RentalStatus::RENTED->value)
+        ->whereNotNull('expires_at')
+        ->whereDate('expires_at', '<=', now())
+        ->get();
+
+    $expiredCount = 0;
     
-    Log::info("Expired {$expiredCount} instructions");
+    foreach ($overdueRentals as $rental) {
+        // ... expiration logic ...
+        $expiredCount++;
+    }
+    
+    \Log::info("Expired {$expiredCount} rentals");
     
     return Command::SUCCESS;
 }
@@ -365,20 +347,33 @@ public function handle()
 Consider using Laravel's failed job handling for critical scheduled tasks:
 
 ```php
-$schedule->command('expire_instructions')
+Schedule::command('rentals:expire')
     ->hourly()
     ->onFailure(function () {
         // Alert ops team
+        \Log::error('Rental expiration job failed');
     });
 ```
+
+## Why Not Use Activity Logs?
+
+You might wonder: if you're already logging status changes, why not use those logs to derive timing?
+
+**Activity logs are for observability, not business logic.** They answer "what happened and when?" for debugging and auditing. But using them as the source of truth for business rules creates several problems:
+
+1. **Fragile string matching:** If log message format changes, your scheduled jobs silently break
+2. **Performance degradation:** Full-text searches on log content don't scale and can't be efficiently indexed
+3. **Unclear intent:** Business rules should be explicit in your schema, not implicit in log messages
+4. **Missed runs:** If a scheduled job misses a day, exact day matching (`== 14`) fails
+
+**Use logs for auditing, timestamps for business logic.** You can still log status changes for audit purposes, but use dedicated columns for time-based business rules.
 
 ## Conclusion
 
 Scheduled jobs turn time-based business rules into code. Instead of relying on users to remember deadlines, the system enforces them automatically.
 
-The pattern is straightforward: query for items in a target state, check if enough time has passed, take action if so. Whether you track timing via logs or dedicated columns, the logic remains the same.
+The pattern is straightforward: use dedicated timestamp columns to track when business events occur, then query for items that meet your time-based criteria. This approach is robust, scalable, and makes your business logic explicit.
 
 Start with your most important time-based rules—expiration, reminders, cleanup—and add more as needed. Laravel's scheduler makes it easy to define when jobs run, and Artisan commands make them testable and debuggable.
 
 Your users will appreciate the proactive communication, and your business rules will be enforced consistently, 24/7.
-

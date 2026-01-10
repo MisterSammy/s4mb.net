@@ -1,104 +1,224 @@
 ---
 title: "Building a Customizable Notification System with User Preferences"
 date: 2025-01-09
-excerpt: "Users hate notification spam. Here's how to build a system where users can choose exactly which events they want to be notified about, with smart defaults and efficient querying."
-tags: [laravel, notifications, livewire, user-experience]
+excerpt: "Use PHP backed enums as your source of truth for notification types instead of database tables. Type-safe, scalable, and zero migration overhead when adding new types."
+tags: [laravel, notifications, livewire, user-experience, php-enums]
 slug: customizable-notification-preferences-laravel
 ---
 
 Nobody likes notification spam. When your application sends emails for every minor event, users either disable all notifications or start ignoring their inbox entirely. Neither outcome is good.
 
-The solution is user-controlled notification preferences. Let users choose which events matter to them. Status changes? Yes. New comments? Definitely. Risk assessment created? Maybe only for some users.
+The solution is user-controlled notification preferences. Let users choose which events matter to them. Course completions? Yes. New comments? Definitely. Assignment graded? Absolutely.
 
-This post walks through building a notification preference system in Laravel—from the database schema to the UI component to the query that efficiently finds who should be notified.
+Most tutorials solve this by creating a `notification_types` table in your database. But here's a question worth asking: if your notification types are developer-defined constants that don't change at runtime, why involve the database at all?
+
+This post shows you a better approach: use a **PHP backed enum** as your single source of truth for notification types. You get type safety, IDE autocomplete, zero migration overhead when adding new types, and all metadata lives right next to the definition. The database only stores user preferences—not the types themselves.
+
+We'll build the complete system: the enum definition, simplified database schema, Livewire component for preferences, and query scopes that efficiently find who should be notified.
+
+## The Scenario: Online Learning Platform
+
+Consider an online learning platform where instructors and students receive various notifications:
+
+**For Instructors:**
+- New student enrolled
+- Assignment submitted
+- Discussion comment posted
+- Course review received
+
+**For Students:**
+- Assignment graded
+- Course updated
+- Discussion reply
+- Certificate available
+
+Different users care about different events. Let them choose.
 
 ## The Database Schema
 
-You need three tables:
-
-1. **staff_notifications** — A registry of all notification types
-2. **notification_user** — A pivot table linking users to their enabled notifications
-3. **users** — Your existing users table
+You only need one table: `notification_preferences`. Notice we don't need a `notification_types` table—the enum is our source of truth.
 
 ```php
-// Migration for staff_notifications
-Schema::create('staff_notifications', function (Blueprint $table) {
+Schema::create('notification_preferences', function (Blueprint $table) {
     $table->id();
-    $table->string('notification');  // "Client Status Changed", "New Comment", etc.
-    $table->timestamps();
-});
-
-// Migration for notification_user pivot
-Schema::create('notification_user', function (Blueprint $table) {
-    $table->id();
-    $table->foreignId('notification_id')->constrained('staff_notifications')->onDelete('cascade');
-    $table->foreignId('user_id')->constrained('users')->onDelete('cascade');
+    $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+    $table->string('type'); // Stores the enum's string value
+    $table->boolean('enabled')->default(true);
     $table->timestamps();
     
-    $table->unique(['notification_id', 'user_id']);
+    $table->unique(['user_id', 'type']);
 });
 ```
 
-Seed the notification types:
+The `type` column stores the string value from our enum (e.g., `'assignment_graded'`). When we retrieve preferences, Laravel's enum casting automatically converts it back to the enum instance.
+
+## The NotificationType Enum
+
+Here's where the magic happens. Instead of a database table, we define all notification types in a PHP backed enum:
 
 ```php
-// Database seeder
-StaffNotification::insert([
-    ['id' => 1, 'notification' => 'Client Created'],
-    ['id' => 2, 'notification' => 'Client Edited'],
-    ['id' => 3, 'notification' => 'Client Status Changed'],
-    ['id' => 4, 'notification' => 'Client Conflict Check Created'],
-    ['id' => 5, 'notification' => 'Client Risk Assessment Created'],
-    ['id' => 10, 'notification' => 'Instruction Status Changed'],
-    ['id' => 11, 'notification' => 'Instruction Created'],
-    ['id' => 12, 'notification' => 'Note Created'],
-    ['id' => 13, 'notification' => 'New Comment'],
-    ['id' => 14, 'notification' => 'Verification Started'],
-    ['id' => 15, 'notification' => 'Verification Completed'],
-]);
+<?php
+
+namespace App\Enums;
+
+enum NotificationType: string
+{
+    // Courses
+    case NewStudentEnrolled = 'new_student_enrolled';
+    case CourseReviewReceived = 'course_review_received';
+    case CourseUpdated = 'course_updated';
+    
+    // Assignments
+    case AssignmentSubmitted = 'assignment_submitted';
+    case AssignmentGraded = 'assignment_graded';
+    case AssignmentDueSoon = 'assignment_due_soon';
+    
+    // Discussions
+    case DiscussionReply = 'discussion_reply';
+    case DiscussionMention = 'discussion_mention';
+    
+    // Achievements
+    case CertificateAvailable = 'certificate_available';
+    case BadgeEarned = 'badge_earned';
+
+    public function label(): string
+    {
+        return match($this) {
+            self::NewStudentEnrolled => 'New Student Enrolled',
+            self::CourseReviewReceived => 'Course Review Received',
+            self::CourseUpdated => 'Course Updated',
+            self::AssignmentSubmitted => 'Assignment Submitted',
+            self::AssignmentGraded => 'Assignment Graded',
+            self::AssignmentDueSoon => 'Assignment Due Soon',
+            self::DiscussionReply => 'Discussion Reply',
+            self::DiscussionMention => 'Discussion Mention',
+            self::CertificateAvailable => 'Certificate Available',
+            self::BadgeEarned => 'Badge Earned',
+        };
+    }
+
+    public function description(): string
+    {
+        return match($this) {
+            self::NewStudentEnrolled => 'When a student enrolls in your course',
+            self::CourseReviewReceived => 'When someone reviews your course',
+            self::CourseUpdated => 'When a course you\'re enrolled in is updated',
+            self::AssignmentSubmitted => 'When a student submits an assignment',
+            self::AssignmentGraded => 'When your assignment is graded',
+            self::AssignmentDueSoon => 'Reminder before assignment deadline',
+            self::DiscussionReply => 'When someone replies to your discussion',
+            self::DiscussionMention => 'When someone mentions you in a discussion',
+            self::CertificateAvailable => 'When you complete a course and earn a certificate',
+            self::BadgeEarned => 'When you earn a new badge',
+        };
+    }
+
+    public function category(): string
+    {
+        return match($this) {
+            self::NewStudentEnrolled,
+            self::CourseReviewReceived,
+            self::CourseUpdated => 'courses',
+            self::AssignmentSubmitted,
+            self::AssignmentGraded,
+            self::AssignmentDueSoon => 'assignments',
+            self::DiscussionReply,
+            self::DiscussionMention => 'discussions',
+            self::CertificateAvailable,
+            self::BadgeEarned => 'achievements',
+        };
+    }
+
+    public function defaultEnabled(): bool
+    {
+        return match($this) {
+            self::BadgeEarned => false,
+            default => true,
+        };
+    }
+
+    public static function grouped(): array
+    {
+        return collect(self::cases())
+            ->groupBy(fn ($case) => $case->category())
+            ->toArray();
+    }
+}
 ```
 
-The gaps in IDs leave room for future notifications in logical groups.
+This enum gives us several benefits:
+
+- **Type safety**: `NotificationType::AssignmentGraded` instead of `'Assignment Graded'` means typos are caught at compile time, not runtime.
+- **IDE autocomplete**: Your editor knows all available notification types and can suggest them.
+- **No migrations**: Adding a new notification type is as simple as adding a new enum case—no database changes needed.
+- **Metadata lives with the definition**: Label, description, category, and default state are all defined right where the type is declared.
+- **Easy refactoring**: Rename an enum case, and your IDE can update all usages automatically.
 
 ## The Models
 
-A simple model for notification types:
+First, the simple `NotificationPreference` model:
 
 ```php
 <?php
 
 namespace App\Models;
 
+use App\Enums\NotificationType;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class StaffNotification extends Model
+class NotificationPreference extends Model
 {
-    protected $table = 'staff_notifications';
-    protected $fillable = ['notification'];
+    protected $fillable = ['user_id', 'type', 'enabled'];
 
-    public function users()
+    protected function casts(): array
     {
-        return $this->belongsToMany(User::class, 'notification_user', 'notification_id', 'user_id');
+        return [
+            'type' => NotificationType::class,
+            'enabled' => 'boolean',
+        ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
     }
 }
 ```
 
-And the inverse relationship on User:
+The `type` cast ensures that when you access `$preference->type`, you get a `NotificationType` enum instance, not a string.
+
+Now the User model methods:
 
 ```php
 // User.php
-public function notifications()
+use App\Enums\NotificationType;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+public function notificationPreferences(): HasMany
 {
-    return $this->belongsToMany(
-        StaffNotification::class, 
-        'notification_user', 
-        'user_id', 
-        'notification_id'
-    );
+    return $this->hasMany(NotificationPreference::class);
+}
+
+/**
+ * Check if user wants to receive a specific notification.
+ */
+public function wantsNotification(NotificationType $type): bool
+{
+    $preference = $this->notificationPreferences()
+        ->where('type', $type->value)
+        ->first();
+
+    // If no preference exists, use the default from the enum
+    if (!$preference) {
+        return $type->defaultEnabled();
+    }
+
+    return $preference->enabled;
 }
 ```
 
-If a user has a record in `notification_user` for a given notification type, they want to receive it. No record means no notification.
+Notice how `wantsNotification()` now accepts a `NotificationType` enum directly—type-safe and impossible to typo.
 
 ## The Preference UI
 
@@ -107,58 +227,61 @@ A Livewire component handles the settings page:
 ```php
 <?php
 
-namespace App\Http\Livewire\Profile;
+namespace App\Livewire\Profile;
 
+use App\Enums\NotificationType;
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
-use Auth;
-use App\Models\UserNotification;
-use App\Models\StaffNotification;
 
 class NotificationSettings extends Component
 {
-    public array $checkboxes = [];
+    public array $preferences = [];
 
-    public function mount()
+    public function mount(): void
     {
-        // Build an array of notification IDs that are currently enabled
-        $enabledNotifications = Auth::user()->notifications->pluck('id')->toArray();
+        $user = Auth::user();
         
-        // Create checkbox state: [notification_id => true/false]
-        $this->checkboxes = array_fill_keys($enabledNotifications, true);
+        // Build preferences array from user's current settings
+        $userPrefs = $user->notificationPreferences
+            ->keyBy(fn ($pref) => $pref->type->value)
+            ->map(fn ($pref) => $pref->enabled);
+
+        // Fill in defaults for unset preferences
+        foreach (NotificationType::cases() as $type) {
+            $this->preferences[$type->value] = 
+                $userPrefs[$type->value] ?? $type->defaultEnabled();
+        }
     }
 
-    public function updateNotification($notification_id)
+    public function toggleNotification(string $typeValue): void
     {
-        $existing = UserNotification::where('notification_id', $notification_id)
-            ->where('user_id', Auth::user()->id)
-            ->first();
+        $type = NotificationType::from($typeValue);
+        $user = Auth::user();
+        $currentState = $this->preferences[$typeValue] ?? false;
+        $newState = !$currentState;
 
-        if ($existing) {
-            // Currently enabled, so disable it
-            $existing->delete();
-            unset($this->checkboxes[$notification_id]);
-        } else {
-            // Currently disabled, so enable it
-            UserNotification::create([
-                'notification_id' => $notification_id,
-                'user_id' => Auth::user()->id
-            ]);
-            $this->checkboxes[$notification_id] = true;
-        }
+        // Update or create the preference
+        // Use $type->value in the where clause since we're querying the database
+        $user->notificationPreferences()->updateOrCreate(
+            ['type' => $type->value],
+            ['enabled' => $newState]
+        );
+
+        $this->preferences[$typeValue] = $newState;
     }
 
     public function render()
     {
-        $allNotifications = StaffNotification::all();
-        
+        $notificationsByCategory = NotificationType::grouped();
+
         return view('livewire.profile.notification-settings', [
-            'notifications' => $allNotifications
+            'notificationsByCategory' => $notificationsByCategory,
         ]);
     }
 }
 ```
 
-The template:
+The template with grouped notifications:
 
 ```blade
 <div>
@@ -167,17 +290,29 @@ The template:
         Choose which events you want to receive email notifications for.
     </p>
 
-    <div class="space-y-4">
-        @foreach($notifications as $notification)
-            <label class="flex items-center gap-3 cursor-pointer">
-                <input 
-                    type="checkbox" 
-                    wire:click="updateNotification({{ $notification->id }})"
-                    @checked(isset($checkboxes[$notification->id]))
-                    class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                >
-                <span>{{ $notification->notification }}</span>
-            </label>
+    <div class="space-y-8">
+        @foreach($notificationsByCategory as $category => $notifications)
+            <div>
+                <h4 class="font-medium text-gray-900 mb-3 capitalize">
+                    {{ str_replace('_', ' ', $category) }}
+                </h4>
+                <div class="space-y-3 ml-4">
+                    @foreach($notifications as $notification)
+                        <label class="flex items-start gap-3 cursor-pointer">
+                            <input 
+                                type="checkbox" 
+                                wire:click="toggleNotification('{{ $notification->value }}')"
+                                @checked($preferences[$notification->value] ?? false)
+                                class="mt-1 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                            >
+                            <div>
+                                <span class="block font-medium">{{ $notification->label() }}</span>
+                                <span class="block text-sm text-gray-500">{{ $notification->description() }}</span>
+                            </div>
+                        </label>
+                    @endforeach
+                </div>
+            </div>
         @endforeach
     </div>
 </div>
@@ -187,198 +322,199 @@ Each checkbox click immediately updates the database. No save button needed—ch
 
 ## Finding Who to Notify
 
-The core query: given a team and a notification type, find all users who should receive it. This combines team membership with notification preferences:
+The core query: given a course and a notification type, find all users who should receive it. Create a query scope for clean, reusable queries:
 
 ```php
 // User.php
-public static function whereShouldBeNotified(int $team_id, string $notificationName)
+use App\Enums\NotificationType;
+
+public function scopeWantsNotification($query, NotificationType $type)
 {
-    // Find the notification type ID
-    $notification_id = StaffNotification::where('notification', $notificationName)
-        ->pluck('id')
-        ->first();
+    return $query->where(function ($q) use ($type) {
+        // Users who explicitly opted in
+        $q->whereHas('notificationPreferences', fn ($pref) => 
+            $pref->where('type', $type->value)->where('enabled', true)
+        )
+        // OR users with no preference who should get the default
+        ->orWhere(function ($defaultQuery) use ($type) {
+            if ($type->defaultEnabled()) {
+                $defaultQuery->whereDoesntHave('notificationPreferences', fn ($pref) =>
+                    $pref->where('type', $type->value)
+                );
+            }
+        });
+    });
+}
 
-    // Find staff users who:
-    // 1. Are members of the specified team
-    // 2. Have opted in to this notification type
-    $users = User::where('isStaff', true)
-        ->join('team_user', 'team_user.user_id', '=', 'users.id')
-        ->where('team_user.team_id', $team_id)
-        ->join('notification_user', 'notification_user.user_id', '=', 'users.id')
-        ->where('notification_user.notification_id', $notification_id)
-        ->get();
+public function scopeEnrolledInCourse($query, int $courseId)
+{
+    return $query->whereHas('enrollments', fn ($q) => $q->where('course_id', $courseId));
+}
 
-    return $users;
+public function scopeInstructorOf($query, int $courseId)
+{
+    return $query->whereHas('courses', fn ($q) => $q->where('courses.id', $courseId));
 }
 ```
 
-This query is efficient—it uses joins rather than nested queries, and the database can use indexes on `team_id` and `notification_id`.
-
-## Special Cases: Client Users for Certain Notifications
-
-Some notifications should always go to certain user types regardless of preferences. For example, all account holders should get comment notifications:
+Now you can chain these scopes elegantly with type-safe enum values:
 
 ```php
-public static function whereShouldBeNotified(int $team_id, string $notificationName)
-{
-    $notification_id = StaffNotification::where('notification', $notificationName)
-        ->pluck('id')
-        ->first();
+// Find all enrolled students who want assignment graded notifications
+$students = User::enrolledInCourse($course->id)
+    ->wantsNotification(NotificationType::AssignmentGraded)
+    ->get();
 
-    $users = User::where('isStaff', true)
-        ->join('team_user', 'team_user.user_id', '=', 'users.id')
-        ->where('team_user.team_id', $team_id)
-        ->join('notification_user', 'notification_user.user_id', '=', 'users.id')
-        ->where('notification_user.notification_id', $notification_id)
-        ->get();
-
-    // Special case: All account holders get comment notifications
-    // ID 13 is "New Comment"
-    if ($notification_id == 13) {
-        $accountHolders = User::where('isStaff', false)
-            ->join('team_user', 'team_user.user_id', '=', 'users.id')
-            ->where('team_user.team_id', $team_id)
-            ->where('team_user.role', 'account-holder')
-            ->get();
-            
-        return $users->merge($accountHolders);
-    }
-
-    return $users;
-}
+// Find the instructor if they want submission notifications
+$instructors = User::instructorOf($course->id)
+    ->wantsNotification(NotificationType::AssignmentSubmitted)
+    ->get();
 ```
 
-## Using the Query in Listeners
+## Using Scopes in Event Listeners
 
-In your event listeners, send notifications to the filtered list:
+In your event listeners, send notifications to the filtered list with type-safe enum usage:
 
 ```php
 <?php
 
-namespace App\Listeners\Client;
+namespace App\Listeners\Assignment;
 
+use App\Enums\NotificationType;
+use App\Events\Assignment\AssignmentGraded;
 use App\Models\User;
-use App\Notifications\Client\ClientStatusChangedNotification;
+use App\Notifications\Assignment\AssignmentGradedNotification;
 use Illuminate\Support\Facades\Notification;
 
-class ClientStatusChanged
+class NotifyStudentOfGrade
 {
-    public function handle($event)
+    public function handle(AssignmentGraded $event): void
     {
-        $client = $event->client;
+        $assignment = $event->assignment;
+        $student = $assignment->student;
 
-        // Only notify users who opted in to this notification type
-        $recipients = User::whereShouldBeNotified(
-            $client->team->id, 
-            'Client Status Changed'
-        );
+        // Only notify if student wants this notification
+        if ($student->wantsNotification(NotificationType::AssignmentGraded)) {
+            $student->notify(new AssignmentGradedNotification($assignment));
+        }
+    }
+}
+```
+
+For bulk notifications:
+
+```php
+<?php
+
+namespace App\Listeners\Course;
+
+use App\Enums\NotificationType;
+use App\Events\Course\CourseUpdated;
+use App\Models\User;
+use App\Notifications\Course\CourseUpdatedNotification;
+use Illuminate\Support\Facades\Notification;
+
+class NotifyEnrolledStudents
+{
+    public function handle(CourseUpdated $event): void
+    {
+        $course = $event->course;
+
+        // Get all enrolled students who want course update notifications
+        $recipients = User::enrolledInCourse($course->id)
+            ->wantsNotification(NotificationType::CourseUpdated)
+            ->get();
 
         Notification::send(
             $recipients,
-            new ClientStatusChangedNotification($client)
+            new CourseUpdatedNotification($course)
         );
     }
 }
 ```
 
-## Setting Defaults on User Creation
-
-New users should have sensible defaults. Don't make them manually enable everything:
-
-```php
-// User.php boot method
-protected static function boot()
-{
-    parent::boot();
-
-    static::created(function($model) {
-        if ($model->isStaff) {
-            // Staff get a default set of notifications
-            DB::table('notification_user')->insert([
-                ['notification_id' => 3, 'user_id' => $model->id],   // Client Status Changed
-                ['notification_id' => 10, 'user_id' => $model->id],  // Instruction Status Changed
-                ['notification_id' => 12, 'user_id' => $model->id],  // Note Created
-                ['notification_id' => 13, 'user_id' => $model->id],  // New Comment
-                ['notification_id' => 14, 'user_id' => $model->id],  // Verification Started
-                ['notification_id' => 15, 'user_id' => $model->id],  // Verification Completed
-            ]);
-        }
-    });
-}
-```
-
-New staff members are subscribed to the most important notifications. They can customize later.
-
-## Grouping Notifications in the UI
-
-As your notification types grow, group them for better UX:
-
-```blade
-<div class="space-y-8">
-    <div>
-        <h4 class="font-medium mb-3">Client Events</h4>
-        <div class="space-y-2 ml-4">
-            @foreach($notifications->where('id', '<', 10) as $notification)
-                {{-- Checkbox component --}}
-            @endforeach
-        </div>
-    </div>
-
-    <div>
-        <h4 class="font-medium mb-3">Instruction Events</h4>
-        <div class="space-y-2 ml-4">
-            @foreach($notifications->whereBetween('id', [10, 12]) as $notification)
-                {{-- Checkbox component --}}
-            @endforeach
-        </div>
-    </div>
-
-    <div>
-        <h4 class="font-medium mb-3">Communication</h4>
-        <div class="space-y-2 ml-4">
-            @foreach($notifications->whereBetween('id', [12, 14]) as $notification)
-                {{-- Checkbox component --}}
-            @endforeach
-        </div>
-    </div>
-</div>
-```
-
-Or add a `category` column to `staff_notifications` for more flexibility.
-
 ## Testing
 
-Test that the query works correctly:
+Test that the query works correctly with enum-based notification types:
 
 ```php
-public function test_only_opted_in_users_receive_notifications()
-{
-    $team = Team::factory()->create();
+use App\Enums\NotificationType;
+use App\Models\User;
+use App\Models\Course;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+
+uses(RefreshDatabase::class);
+
+it('only includes users who opted in to notifications', function () {
+    $course = Course::factory()->create();
     
     // User who opted in
-    $optedIn = User::factory()->create(['isStaff' => true]);
-    $optedIn->teams()->attach($team);
-    DB::table('notification_user')->insert([
-        'notification_id' => 3, // Client Status Changed
-        'user_id' => $optedIn->id
+    $optedIn = User::factory()->create();
+    $optedIn->enrollments()->create(['course_id' => $course->id]);
+    $optedIn->notificationPreferences()->create([
+        'type' => NotificationType::AssignmentGraded,
+        'enabled' => true,
     ]);
     
-    // User who did not opt in
-    $optedOut = User::factory()->create(['isStaff' => true]);
-    $optedOut->teams()->attach($team);
+    // User who opted out
+    $optedOut = User::factory()->create();
+    $optedOut->enrollments()->create(['course_id' => $course->id]);
+    $optedOut->notificationPreferences()->create([
+        'type' => NotificationType::AssignmentGraded,
+        'enabled' => false,
+    ]);
     
-    $recipients = User::whereShouldBeNotified($team->id, 'Client Status Changed');
+    $recipients = User::enrolledInCourse($course->id)
+        ->wantsNotification(NotificationType::AssignmentGraded)
+        ->get();
     
-    $this->assertTrue($recipients->contains($optedIn));
-    $this->assertFalse($recipients->contains($optedOut));
-}
+    expect($recipients)->toContain($optedIn)
+        ->not->toContain($optedOut);
+});
+
+it('uses defaults when user has no preference set', function () {
+    $course = Course::factory()->create();
+    
+    // User with no explicit preference
+    // CourseUpdated has defaultEnabled() => true, so they should be included
+    $user = User::factory()->create();
+    $user->enrollments()->create(['course_id' => $course->id]);
+    
+    $recipients = User::enrolledInCourse($course->id)
+        ->wantsNotification(NotificationType::CourseUpdated)
+        ->get();
+    
+    expect($recipients)->toContain($user);
+});
+
+it('respects default disabled preference', function () {
+    $course = Course::factory()->create();
+    
+    // BadgeEarned has defaultEnabled() => false
+    // User with no explicit preference should NOT receive it
+    $user = User::factory()->create();
+    $user->enrollments()->create(['course_id' => $course->id]);
+    
+    $recipients = User::enrolledInCourse($course->id)
+        ->wantsNotification(NotificationType::BadgeEarned)
+        ->get();
+    
+    expect($recipients)->not->toContain($user);
+});
 ```
 
 ## Conclusion
 
 A notification preference system respects your users' attention. Instead of blasting everyone with every event, you send targeted notifications to people who care.
 
-The implementation is straightforward: a registry of notification types, a pivot table for preferences, and a query that combines team membership with opt-in status. Add a Livewire component for instant updates, and you've got a system that scales to dozens of notification types without overwhelming anyone.
+The enum-based approach we've built gives you several advantages over the traditional database-table approach:
 
-Your users' inboxes will thank you.
+- **Type safety**: IDE autocomplete and compile-time checks prevent typos like `'Assigment Graded'` (notice the typo).
+- **Simpler schema**: One table for preferences instead of two—no need to manage a registry table.
+- **Zero migration overhead**: Adding a new notification type is as simple as adding a new enum case. No database migration, no seeding, no coordination.
+- **Metadata co-location**: Label, description, category, and default state all live right where the type is defined, making it easy to understand and modify.
+- **Refactor-friendly**: Rename an enum case, and your IDE can update all usages automatically.
 
+The implementation scales cleanly: add new enum cases as your application grows, and the rest of the system adapts automatically. The database only stores what matters—user preferences—while the developer-defined types live in code where they belong.
+
+Your users' inboxes will thank you, and so will your future self when you need to add a new notification type.
