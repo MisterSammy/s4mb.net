@@ -137,6 +137,63 @@
                 </div>
             </div>
 
+            {{-- Tag Filter Bar --}}
+            @if($tags->isNotEmpty())
+                <div class="tag-filter-bar mb-8">
+                    <div class="flex flex-wrap items-center gap-2">
+                        {{-- All button --}}
+                        <button
+                            type="button"
+                            id="tag-filter-all"
+                            class="tag-pill tag-pill--active"
+                            onclick="window.TagFilter?.clear()"
+                        >
+                            <span class="tag-pill__label">All</span>
+                        </button>
+
+                        {{-- Tag pills --}}
+                        @foreach($tags as $tag)
+                            <x-tag-pill
+                                :slug="$tag['slug']"
+                                :label="$tag['label']"
+                                :count="$tag['count']"
+                                :color="$tag['color'] ?? null"
+                            />
+                        @endforeach
+                    </div>
+
+                    {{-- Active filters indicator --}}
+                    <div id="active-filters" class="hidden items-center gap-2 mt-4 text-sm text-[var(--color-text-muted)]">
+                        <span class="font-mono">Showing posts with <span class="active-filter-count font-bold text-[var(--color-accent)]">0</span> selected tag(s)</span>
+                        <button
+                            type="button"
+                            onclick="window.TagFilter?.clear()"
+                            class="text-[var(--color-accent)] hover:underline font-mono"
+                        >
+                            Clear filters
+                        </button>
+                    </div>
+                </div>
+            @endif
+
+            {{-- No results message --}}
+            <div id="no-results" class="hidden py-16 text-center">
+                <div class="dashed-circle w-24 h-24 mx-auto mb-6 flex items-center justify-center" aria-hidden="true">
+                    <svg class="w-8 h-8 text-[var(--color-border)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                </div>
+                <p class="text-[var(--color-text-muted)] font-mono text-sm mb-4">No posts match the selected tags.</p>
+                <button
+                    type="button"
+                    onclick="window.TagFilter?.clear()"
+                    class="text-[var(--color-accent)] hover:underline font-mono text-sm"
+                >
+                    Clear filters
+                </button>
+            </div>
+
             @if($posts->isEmpty())
                 <div class="py-16 text-center relative">
                     {{-- Empty state decoration --}}
@@ -148,7 +205,10 @@
             @else
                 <div class="space-y-0">
                     @foreach($posts as $index => $post)
-                        <article class="group border-b border-[var(--color-border)] last:border-b-0 relative">
+                        <article
+                            class="group border-b border-[var(--color-border)] last:border-b-0 relative"
+                            data-tags="{{ collect($post->tags)->map(fn($t) => \Illuminate\Support\Str::slug($t))->implode(',') }}"
+                        >
                             {{-- Index number --}}
                             <span class="absolute -left-8 top-1/2 -translate-y-1/2 font-mono text-xs text-[var(--color-border)] hidden lg:block" style="width: 2ch; text-align: right;" aria-hidden="true">
                                 {{ str_pad($index + 1, 2, '0', STR_PAD_LEFT) }}
@@ -169,6 +229,24 @@
                                         <p class="text-sm text-[var(--color-text-muted)] font-mono line-clamp-2">
                                             {{ Str::limit($post->getDisplayExcerpt(), 200) }}
                                         </p>
+
+                                        {{-- Inline tags --}}
+                                        @if(!empty($post->tags))
+                                            <div class="flex flex-wrap gap-1.5 mt-3">
+                                                @foreach(array_slice($post->tags, 0, 4) as $tag)
+                                                    @php
+                                                        $tagSlug = \Illuminate\Support\Str::slug($tag);
+                                                        $tagData = app(\App\Services\TagRegistryService::class)->getTag($tagSlug);
+                                                    @endphp
+                                                    <span class="post-tag-inline">
+                                                        {{ $tagData['label'] ?? \Illuminate\Support\Str::title(str_replace('-', ' ', $tag)) }}
+                                                    </span>
+                                                @endforeach
+                                                @if(count($post->tags) > 4)
+                                                    <span class="post-tag-inline post-tag-inline--more">+{{ count($post->tags) - 4 }}</span>
+                                                @endif
+                                            </div>
+                                        @endif
                                     </div>
 
                                     {{-- Post date --}}

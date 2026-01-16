@@ -621,3 +621,139 @@ a:hover {
     top: 0.85rem;
     font-size: 1.25rem;
 }
+
+/* ========================================
+   TAG PILLS & FILTERING
+   ======================================== */
+
+/* Tag pill base styles */
+.tag-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.375rem;
+    padding: 0.25rem 0.625rem;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    line-height: 1.25;
+    color: var(--color-text-muted);
+    background: transparent;
+    border: 1px solid var(--color-border);
+    border-radius: 0; /* Pixel art style - no rounded corners */
+    transition: all 0.15s ease;
+    white-space: nowrap;
+}
+
+.tag-pill:hover {
+    color: var(--color-text);
+    border-color: var(--color-text-muted);
+    background: var(--color-surface);
+    text-decoration: none;
+    font-weight: normal;
+}
+
+.tag-pill:focus-visible {
+    outline: 2px solid var(--color-accent);
+    outline-offset: 2px;
+}
+
+/* Active state */
+.tag-pill--active {
+    color: var(--color-background);
+    background: var(--tag-accent-color, var(--color-accent));
+    border-color: var(--tag-accent-color, var(--color-accent));
+}
+
+.tag-pill--active:hover {
+    background: var(--tag-accent-color, var(--color-accent));
+    border-color: var(--tag-accent-color, var(--color-accent));
+    color: var(--color-background);
+    opacity: 0.9;
+}
+
+/* Small variant */
+.tag-pill--small {
+    padding: 0.125rem 0.375rem;
+    font-size: 0.625rem;
+    gap: 0.25rem;
+}
+
+.tag-pill--small .tag-pill__icon {
+    width: 10px;
+    height: 10px;
+}
+
+/* Tag pill icon */
+.tag-pill__icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 14px;
+    height: 14px;
+    flex-shrink: 0;
+}
+
+.tag-pill__icon svg {
+    width: 100%;
+    height: 100%;
+}
+
+/* Tag pill label */
+.tag-pill__label {
+    flex-shrink: 0;
+}
+
+/* Tag pill count */
+.tag-pill__count {
+    color: var(--color-text-muted);
+    opacity: 0.7;
+    font-size: 0.625rem;
+}
+
+.tag-pill--active .tag-pill__count {
+    color: var(--color-background);
+    opacity: 0.8;
+}
+
+/* Inline post tags */
+.post-tag-inline {
+    display: inline-block;
+    padding: 0.125rem 0.375rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--color-text-muted);
+    background: var(--color-surface);
+    border: 1px solid var(--color-border);
+    border-radius: 0;
+}
+
+.post-tag-inline--more {
+    background: transparent;
+    border-style: dashed;
+}
+
+/* Post fade-in animation */
+@keyframes post-fade-in {
+    from {
+        opacity: 0.5;
+        transform: translateY(4px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.post-fade-in {
+    animation: post-fade-in 0.2s ease-out;
+}
+
+/* Respect reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+    .tag-pill {
+        transition: none;
+    }
+
+    .post-fade-in {
+        animation: none;
+    }
+}

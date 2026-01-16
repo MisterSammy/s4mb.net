@@ -42,14 +42,20 @@ app/
 │       └── PostController.php      # Shows single post
 ├── Services/
 │   ├── MarkdownPostService.php     # File parsing logic
+│   ├── TagRegistryService.php      # Tag data access
 │   └── ThemeService.php            # Theme management
+├── Console/
+│   └── Commands/
+│       └── ScanTagsCommand.php     # Tag registry generator
 └── View/
     └── Composers/
         └── ThemeComposer.php       # Injects theme data
 
 storage/
-└── posts/
-    └── *.md                         # Your blog posts
+├── posts/
+│   └── *.md                         # Your blog posts
+└── app/
+    └── tags-registry.json           # Generated tag data
 
 resources/
 └── views/
@@ -206,6 +212,52 @@ The blog supports two themes:
 4. Theme switching uses a simple form POST to update the session
 
 Themes are defined in `config/themes.php` and converted to CSS custom properties by `ThemeService`.
+
+## Tag System
+
+The homepage includes a tag filtering feature that allows visitors to filter posts by topic.
+
+### How It Works
+
+1. **Tag Registry**: Tags are scanned from all posts and stored in `storage/app/tags-registry.json`
+2. **Tag Configuration**: Icon mappings and labels are defined in `config/tags.php`
+3. **Client-side Filtering**: JavaScript handles filtering without page reloads
+4. **URL State**: Filter state is preserved in the URL (`?tags=laravel,php`) for shareable links
+
+### Generating the Tag Registry
+
+After adding or modifying posts, regenerate the tag registry:
+
+```bash
+php artisan tags:scan
+```
+
+Available options:
+- `--dry-run` - Preview the registry without writing to file
+- `--show-unmapped` - Display tags that don't have custom icon mappings
+
+### Adding Custom Tag Icons
+
+Edit `config/tags.php` to add mappings for new tags:
+
+```php
+'mappings' => [
+    'my-new-tag' => [
+        'label' => 'My New Tag',
+        'icon' => 'code',        // Icon key from the icons array
+        'color' => '#FF5733',    // Optional accent color
+    ],
+],
+```
+
+Icons are inline SVGs defined in the `icons` array of the same config file. Use `viewBox="0 0 24 24"` and `currentColor` for consistency.
+
+### Unmapped Tags
+
+Tags without explicit mappings in `config/tags.php` will:
+- Use a title-cased label (e.g., `my-tag` → "My Tag")
+- Display the default tag icon
+- Still be fully functional for filtering
 
 ## Testing
 

@@ -1,4 +1,5 @@
 import './bootstrap';
+import './tag-filter';
 import hljs from 'highlight.js/lib/core';
 import 'highlight.js/styles/monokai.css';
 

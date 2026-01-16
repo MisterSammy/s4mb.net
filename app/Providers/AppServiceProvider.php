@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Services\TagRegistryService;
 use App\Services\ThemeService;
 use App\View\Composers\ThemeComposer;
 use Illuminate\Support\Facades\View;
@@ -15,6 +16,7 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(ThemeService::class);
+        $this->app->singleton(TagRegistryService::class);
     }
 
     /**
