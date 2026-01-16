@@ -603,3 +603,21 @@ a:hover {
 .prose blockquote {
     font-family: var(--font-sans);
 }
+
+/* Alert/Note boxes */
+.prose .alert-note {
+    background-color: #fef3c7;
+    border-left: 4px solid #f59e0b;
+    padding: 1rem 1rem 1rem 3rem;
+    margin: 1.5rem 0;
+    position: relative;
+    color: #92400e;
+}
+
+.prose .alert-note::before {
+    content: '\26A0';  /* Warning symbol */
+    position: absolute;
+    left: 0.75rem;
+    top: 0.85rem;
+    font-size: 1.25rem;
+}

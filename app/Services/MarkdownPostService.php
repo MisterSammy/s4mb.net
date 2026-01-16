@@ -250,13 +250,31 @@ class MarkdownPostService
     }
 
     /**
+     * Process :::note ... ::: blocks into HTML alert divs.
+     */
+    protected function processAlertBlocks(string $content): string
+    {
+        // Match :::note ... ::: blocks (multiline)
+        $pattern = '/:::note\s*\n(.*?)\n:::/s';
+
+        return preg_replace_callback($pattern, function ($matches) {
+            $text = trim($matches[1]);
+
+            return '<div class="alert-note">'.$text.'</div>';
+        }, $content);
+    }
+
+    /**
      * Render markdown content and inject anchor IDs into h2 elements.
      */
     public function renderMarkdownWithIds(string $markdownContent): string
     {
-        // First, render the markdown to HTML
+        // Process alert blocks before markdown rendering
+        $markdownContent = $this->processAlertBlocks($markdownContent);
+
+        // Render markdown with HTML allowed for our alert divs
         $html = str($markdownContent)->markdown([
-            'html_input' => 'strip',
+            'html_input' => 'allow',
             'allow_unsafe_links' => false,
         ]);
 

@@ -15,10 +15,10 @@ Laravel's polymorphic relationships let you create one `notes` table that can at
 ## The Scenario: Property Management
 
 A property management company tracks various entities:
-- **Properties**  -  Buildings and units under management
-- **Tenants**  -  Current and past occupants
-- **Work Orders**  -  Maintenance requests and repairs
-- **Leases**  -  Active rental agreements
+- **Properties** - Buildings and units under management
+- **Tenants** - Current and past occupants
+- **Work Orders** - Maintenance requests and repairs
+- **Leases** - Active rental agreements
 
 Staff need to add notes to all of these. A polymorphic notes system lets them do that with one unified feature.
 
@@ -29,21 +29,18 @@ A polymorphic table needs two columns to identify what it's attached to:
 ```php
 Schema::create('notes', function (Blueprint $table) {
     $table->id();
-    $table->morphs('noteable');  // Creates noteable_type and noteable_id
-    $table->foreignId('user_id')->constrained()->onDelete('cascade');
+    $table->morphs('noteable');
+    $table->foreignId('user_id')->constrained()->cascadeOnDelete();
     $table->text('content');
-    $table->boolean('is_private')->default(false);  // Staff-only notes
+    $table->boolean('is_private')->default(false);
     $table->timestamps();
     $table->softDeletes();
-    
-    // Index for faster queries
-    $table->index(['noteable_type', 'noteable_id', 'created_at']);
 });
 ```
 
 The `morphs()` helper creates:
-- `noteable_type` .  The class name of the parent model (`App\Models\Property`)
-- `noteable_id`  -  The ID of the specific record
+- `noteable_type` - The class name of the parent model (`App\Models\Property`)
+- `noteable_id` - The ID of the specific record
 
 Together they form a "pointer" to any model in your system.
 
@@ -54,7 +51,6 @@ Together they form a "pointer" to any model in your system.
 
 namespace App\Models;
 
-use App\Events\Note\NoteCreated;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
@@ -64,114 +60,68 @@ class Note extends Model
 {
     use SoftDeletes;
 
-    protected $fillable = [
-        'noteable_id',
-        'noteable_type',
-        'user_id',
-        'content',
-        'is_private',
-    ];
-
-    protected $dispatchesEvents = [
-        'created' => NoteCreated::class,
-    ];
+    protected $fillable = ['noteable_id', 'noteable_type', 'user_id', 'content', 'is_private'];
 
     protected function casts(): array
     {
-        return [
-            'is_private' => 'boolean',
-        ];
+        return ['is_private' => 'boolean'];
     }
 
-    /**
-     * Get the parent model (property, tenant, work order, etc.)
-     */
     public function noteable(): MorphTo
     {
         return $this->morphTo();
     }
 
-    /**
-     * Get the user who created this note.
-     */
     public function author(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
-
-    public function getCreatedAtDate(): string
-    {
-        return $this->created_at->format('M j, Y g:i A');
-    }
 }
 ```
 
-The `morphTo()` relationship is the inverse of the polymorphic relationship. It lets you access the parent model without knowing what type it is:
+The `morphTo()` relationship is the inverse side. It lets you access the parent model without knowing what type it is:
 
 ```php
 $note = Note::find(1);
-$parent = $note->noteable;  // Could be a Property, Tenant, WorkOrder, anything
+$parent = $note->noteable;  // Could be Property, Tenant, WorkOrder, etc.
 ```
 
 ## Adding Notes to Models
 
-On each model that can have notes, add the inverse relationship:
+Rather than repeating the same relationship on every model, extract it into a trait:
 
 ```php
-// Property.php
-public function notes(): MorphMany
-{
-    return $this->morphMany(Note::class, 'noteable')
-        ->orderByDesc('created_at');
-}
-
-// Tenant.php
-public function notes(): MorphMany
-{
-    return $this->morphMany(Note::class, 'noteable')
-        ->orderByDesc('created_at');
-}
-
-// WorkOrder.php
-public function notes(): MorphMany
-{
-    return $this->morphMany(Note::class, 'noteable')
-        ->orderByDesc('created_at');
-}
-
-// Lease.php
-public function notes(): MorphMany
-{
-    return $this->morphMany(Note::class, 'noteable')
-        ->orderByDesc('created_at');
-}
-```
-
-The `morphMany()` method takes the Note class and the relationship name (`noteable`). Laravel knows to look for `noteable_type` and `noteable_id` columns.
-
-For DRY code, you can extract this into a trait:
-
-```php
-// HasNotes.php
 trait HasNotes
 {
     public function notes(): MorphMany
     {
-        return $this->morphMany(Note::class, 'noteable')
-            ->orderByDesc('created_at');
+        return $this->morphMany(Note::class, 'noteable')->latest();
     }
 }
+```
 
-// Then on your models:
+Then apply it to any model that needs notes:
+
+```php
 class Property extends Model
+{
+    use HasNotes;
+}
+
+class Tenant extends Model
+{
+    use HasNotes;
+}
+
+class WorkOrder extends Model
 {
     use HasNotes;
 }
 ```
 
-## Creating Notes
+The `morphMany()` method takes the Note class and the relationship name (`noteable`). Laravel looks for `noteable_type` and `noteable_id` columns automatically.
 
-Creating a note is straightforward:
+## Creating Notes
 
 ```php
 // Via the relationship (preferred)
@@ -186,7 +136,7 @@ Note::create([
     'noteable_type' => Property::class,
     'noteable_id' => $property->id,
     'user_id' => auth()->id(),
-    'content' => 'Inspected unit 4B. Minor water damage near kitchen window.',
+    'content' => 'Inspected unit 4B.',
 ]);
 ```
 
@@ -197,7 +147,7 @@ The relationship approach is cleaner - you don't need to specify the type and ID
 Get all notes for a model:
 
 ```php
-$property->notes;  // Collection of Note models
+$property->notes;
 ```
 
 Get notes with authors eager-loaded:
@@ -210,7 +160,7 @@ foreach ($property->notes as $note) {
 }
 ```
 
-Get only visible notes (filter out private notes for non-staff):
+Filter out private notes for non-staff users:
 
 ```php
 $property->notes()
@@ -233,32 +183,24 @@ Note::where('noteable_type', Property::class)->get();
 
 ## Displaying Notes
 
-In Blade, a simple notes list:
-
 ```blade
-<div class="space-y-4">
-    @forelse($property->notes as $note)
-        <div class="bg-gray-50 p-4 rounded-lg">
-            <div class="flex justify-between items-start">
-                <div class="flex items-center gap-2">
-                    <span class="font-medium">{{ $note->author->name }}</span>
-                    @if($note->is_private)
-                        <span class="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded">
-                            Staff Only
-                        </span>
-                    @endif
-                </div>
-                <span class="text-sm text-gray-500">{{ $note->getCreatedAtDate() }}</span>
-            </div>
-            <p class="mt-2 text-gray-700 whitespace-pre-wrap">{{ $note->content }}</p>
-        </div>
-    @empty
-        <p class="text-gray-500 text-center py-4">No notes yet.</p>
-    @endforelse
-</div>
+@forelse($property->notes as $note)
+    <article>
+        <header>
+            <strong>{{ $note->author->name }}</strong>
+            <time>{{ $note->created_at->diffForHumans() }}</time>
+            @if($note->is_private)
+                <span>Staff Only</span>
+            @endif
+        </header>
+        <p>{{ $note->content }}</p>
+    </article>
+@empty
+    <p>No notes yet.</p>
+@endforelse
 ```
 
-## A Livewire Component for Creating Notes
+## A Livewire Component
 
 ```php
 <?php
@@ -266,7 +208,6 @@ In Blade, a simple notes list:
 namespace App\Livewire\Notes;
 
 use App\Models\Note;
-use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 
 class CreateNote extends Component
@@ -284,18 +225,12 @@ class CreateNote extends Component
 
     public function save(): void
     {
-        $this->validate([
-            'content' => 'required|min:3|max:5000',
-        ]);
-
-        if (!Auth::user()->hasPermission('note:create')) {
-            abort(403);
-        }
+        $this->validate(['content' => 'required|min:3|max:5000']);
 
         Note::create([
             'noteable_type' => $this->noteableType,
             'noteable_id' => $this->noteableId,
-            'user_id' => Auth::id(),
+            'user_id' => auth()->id(),
             'content' => $this->content,
             'is_private' => $this->isPrivate,
         ]);
@@ -314,35 +249,18 @@ class CreateNote extends Component
 The template:
 
 ```blade
-<div>
-    <form wire:submit="save">
-        <textarea
-            wire:model="content"
-            rows="3"
-            placeholder="Add a note..."
-            class="w-full border rounded-lg p-3 focus:ring-2 focus:ring-blue-500"
-        ></textarea>
-        
-        @error('content')
-            <p class="text-red-500 text-sm mt-1">{{ $message }}</p>
-        @enderror
+<form wire:submit="save">
+    <textarea wire:model="content" placeholder="Add a note..."></textarea>
+    @error('content') <p>{{ $message }}</p> @enderror
 
-        <div class="flex justify-between items-center mt-3">
-            @if(auth()->user()->isStaff())
-                <label class="flex items-center gap-2 text-sm">
-                    <input type="checkbox" wire:model="isPrivate" class="rounded">
-                    <span>Staff only</span>
-                </label>
-            @else
-                <div></div>
-            @endif
+    @if(auth()->user()->isStaff())
+        <label>
+            <input type="checkbox" wire:model="isPrivate"> Staff only
+        </label>
+    @endif
 
-            <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
-                Add Note
-            </button>
-        </div>
-    </form>
-</div>
+    <button type="submit">Add Note</button>
+</form>
 ```
 
 Use it on any page:
@@ -356,38 +274,25 @@ Use it on any page:
 
 ## Events and Notifications
 
-Since all notes flow through one model, you can attach events and notifications centrally:
+Since all notes flow through one model, you can handle events centrally:
 
 ```php
-// Note.php
-protected $dispatchesEvents = [
-    'created' => NoteCreated::class,
-];
-
-// NoteCreatedListener.php
-public function handle(NoteCreated $event): void
+class NoteObserver
 {
-    $note = $event->note;
-    $parent = $note->noteable;
-    
-    // Skip private notes for tenant notifications
-    if ($note->is_private) {
-        return;
-    }
-    
-    // Notify relevant people based on the parent type
-    $recipients = match ($parent::class) {
-        Property::class => $parent->propertyManager,
-        Tenant::class => $parent->assignedAgent,
-        WorkOrder::class => $parent->assignedTechnician,
-        default => null,
-    };
-    
-    if ($recipients) {
-        Notification::send(
-            $recipients,
-            new NoteCreatedNotification($note)
-        );
+    public function created(Note $note): void
+    {
+        if ($note->is_private) {
+            return;
+        }
+
+        $recipient = match ($note->noteable::class) {
+            Property::class => $note->noteable->manager,
+            Tenant::class => $note->noteable->agent,
+            WorkOrder::class => $note->noteable->technician,
+            default => null,
+        };
+
+        $recipient?->notify(new NoteAdded($note));
     }
 }
 ```
