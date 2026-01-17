@@ -49,7 +49,7 @@
         <div class="relative min-h-screen">
             {{-- Header --}}
             <header class="border-b border-[var(--color-border)] relative z-10">
-                <div class="max-w-5xl mx-auto px-6 lg:px-8">
+                <div class="max-w-6xl mx-auto px-6 lg:px-8">
                     <nav class="flex items-center justify-between h-16" aria-label="Primary navigation">
                         {{-- Logo/Avatar --}}
                         <div class="flex items-center gap-3">
@@ -61,7 +61,7 @@
                         </div>
 
                         {{-- Navigation --}}
-                        <div class="flex items-center gap-8">
+                        <div class="flex items-center gap-4 sm:gap-8">
                             <a href="{{ url('/') }}#posts" class="font-mono text-sm text-[var(--color-text-muted)] transition-colors hover-line">
                                 Posts
                             </a>
@@ -98,7 +98,7 @@
                     <div class="arc w-48 h-48" style="transform: rotate(180deg); top: -32px; right: -32px;"></div>
                 </div>
 
-                <div class="max-w-5xl mx-auto px-6 lg:px-8 relative z-10">
+                <div class="max-w-6xl mx-auto px-6 lg:px-8 relative z-10">
                     <div class="flex flex-col md:flex-row items-center justify-between gap-6">
                         <div class="flex items-center gap-6">
                             <a href="https://github.com/MisterSammy" target="_blank" rel="noopener" class="font-mono text-xs text-[var(--color-text-muted)] transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-[var(--color-accent)] focus-visible:outline-offset-2">GitHub</a>

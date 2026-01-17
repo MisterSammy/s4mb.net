@@ -43,7 +43,7 @@
             <path d="M0,30 Q25,10 50,30 T100,30 T150,30 T200,30" fill="none" stroke="currentColor" stroke-width="1" class="text-[var(--color-border)]"/>
         </svg>
 
-        <div class="max-w-5xl mx-auto px-6 lg:px-8 relative z-10">
+        <div class="max-w-6xl mx-auto px-6 lg:px-8 relative z-10">
             <div class="max-w-2xl">
                 {{-- Date decoration --}}
                 <div class="flex items-center gap-4 mb-8">
@@ -108,6 +108,7 @@
 
     {{-- Posts Section --}}
     <main id="main-content" class="py-16 relative min-h-[400px]">
+        <div id="posts" class="absolute -top-16"></div>
         {{-- Ruled lines decoration (left side) --}}
         <div class="ruled-lines absolute left-0 top-0 bottom-0 w-16 hidden lg:block" aria-hidden="true"></div>
 
@@ -118,7 +119,7 @@
             </div>
         </div>
 
-        <div class="max-w-5xl mx-auto px-6 lg:px-8">
+        <div class="max-w-6xl mx-auto px-6 lg:px-8">
             {{-- Section header --}}
             <div class="flex items-center justify-between mb-12">
                 <div class="section-line flex-1">

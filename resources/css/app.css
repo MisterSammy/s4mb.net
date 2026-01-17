@@ -533,16 +533,16 @@ a:hover {
     --tw-prose-quote-borders: var(--color-accent);
     --tw-prose-captions: var(--color-text-muted);
     --tw-prose-code: var(--color-darkest);
-    --tw-prose-pre-code: #f8f8f2; /* Monokai light text */
-    --tw-prose-pre-bg: #272822; /* Monokai dark background */
+    --tw-prose-pre-code: #b3b9c5; /* New Moon foreground */
+    --tw-prose-pre-bg: #2d2d2d; /* New Moon background */
     --tw-prose-th-borders: var(--color-border);
     --tw-prose-td-borders: var(--color-border);
 }
 
-/* Code block styling - dark background for Monokai theme */
+/* Code block styling - dark background for New Moon theme */
 .prose pre {
-    background: #272822 !important; /* Monokai dark background */
-    border: 1px solid #49483e;
+    background: #2d2d2d !important; /* New Moon background */
+    border: 1px solid #3d3d3d;
     border-radius: 0;
     padding: 1rem;
     white-space: pre-wrap; /* Preserve whitespace but allow wrapping */
@@ -568,6 +568,163 @@ a:hover {
     padding: 0.125rem 0.25rem;
     border-radius: 0;
     color: var(--color-darkest);
+}
+
+/* ========================================
+   CODE BLOCK COPY BUTTON
+   ======================================== */
+
+.copy-button {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.5rem;
+    padding: 0.375rem;
+    background: #3d3d3d;
+    border: 1px solid #4d4d4d;
+    border-radius: 0;
+    color: #b3b9c5;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s ease, background-color 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+}
+
+.prose pre:hover .copy-button,
+.prose pre:focus-within .copy-button {
+    opacity: 1;
+}
+
+.copy-button:hover {
+    background: #4d4d4d;
+}
+
+.copy-button:focus {
+    outline: 2px solid #92d192;
+    outline-offset: 2px;
+    opacity: 1;
+}
+
+.copy-button.copied {
+    background: #92d192;
+    border-color: #92d192;
+    color: #2d2d2d;
+}
+
+.copy-button svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Touch devices: always show copy button */
+@media (hover: none) {
+    .copy-button {
+        opacity: 1;
+    }
+}
+
+/* ========================================
+   NEW MOON SYNTAX HIGHLIGHTING THEME
+   ======================================== */
+
+.hljs {
+    background: #2d2d2d;
+    color: #b3b9c5;
+}
+
+/* Comments */
+.hljs-comment,
+.hljs-quote {
+    color: #777c85;
+}
+
+/* Functions - Lightest/White */
+.hljs-title,
+.hljs-title.function_,
+.hljs-title.class_ {
+    color: #ffffff;
+}
+
+/* Variables - Red */
+.hljs-variable,
+.hljs-template-variable,
+.hljs-deletion {
+    color: #f2777a;
+}
+
+/* Numbers - Orange */
+.hljs-number,
+.hljs-literal,
+.hljs-link {
+    color: #fca369;
+}
+
+/* Attributes - Yellow */
+.hljs-attr,
+.hljs-attribute {
+    color: #ffd479;
+}
+
+/* Keywords - Light Yellow */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-selector-id {
+    color: #ffeea6;
+}
+
+/* Strings - Green */
+.hljs-string,
+.hljs-regexp,
+.hljs-addition,
+.hljs-meta .hljs-string {
+    color: #92d192;
+}
+
+/* Class/Tag - Blue */
+.hljs-tag,
+.hljs-name,
+.hljs-selector-class {
+    color: #6ab0f3;
+}
+
+/* Constants/Pseudo - Aqua */
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-selector-pseudo {
+    color: #76d4d6;
+}
+
+/* Support - Purple */
+.hljs-type,
+.hljs-params,
+.hljs-meta,
+.hljs-meta .hljs-keyword {
+    color: #e1a6f2;
+}
+
+/* Operator - Beige */
+.hljs-operator,
+.hljs-punctuation {
+    color: #ac8d58;
+}
+
+/* Section headers */
+.hljs-section {
+    color: #ffffff;
+    font-weight: bold;
+}
+
+/* Emphasis */
+.hljs-emphasis {
+    font-style: italic;
+}
+
+.hljs-strong {
+    font-weight: bold;
 }
 
 /* Links with underline offset for better readability */
@@ -755,5 +912,165 @@ a:hover {
 
     .post-fade-in {
         animation: none;
+    }
+}
+
+/* ========================================
+   READING PROGRESS BAR
+   ======================================== */
+
+.reading-progress {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 0%;
+    height: 3px;
+    background: var(--color-accent);
+    z-index: 100;
+    transition: width 0.1s ease-out;
+}
+
+/* ========================================
+   IMAGE LOADING
+   ======================================== */
+
+.prose img {
+    background: var(--color-surface);
+    transition: opacity 0.3s ease;
+}
+
+.prose img[loading="lazy"] {
+    opacity: 0;
+}
+
+.prose img.loaded,
+.prose img:not([loading="lazy"]) {
+    opacity: 1;
+}
+
+/* ========================================
+   MOBILE RESPONSIVENESS
+   ======================================== */
+
+@media (max-width: 640px) {
+    /* Viewport containment - prevent horizontal scroll */
+    html {
+        overflow-x: clip;
+    }
+
+    body {
+        max-width: 100vw;
+        overflow-x: clip;
+    }
+
+    /* Prose typography - smaller on mobile */
+    .prose {
+        font-size: 1rem;
+    }
+
+    .prose p,
+    .prose li {
+        font-size: 1rem;
+        line-height: 1.7;
+    }
+
+    /* Headings - scaled down for mobile */
+    .prose h1 {
+        font-size: 1.75rem;
+        line-height: 1.2;
+    }
+
+    .prose h2 {
+        font-size: 1.375rem;
+        margin-top: 2rem;
+        margin-bottom: 0.75rem;
+    }
+
+    .prose h3 {
+        font-size: 1.125rem;
+        margin-top: 1.5rem;
+        margin-bottom: 0.5rem;
+    }
+
+    /* Code blocks - smaller font for ASCII diagrams */
+    .prose pre {
+        font-size: 0.7rem;
+        line-height: 1.4;
+        padding: 0.75rem;
+        margin-left: -1.5rem;
+        margin-right: -1.5rem;
+        border-left: none;
+        border-right: none;
+    }
+
+    .prose pre code {
+        font-size: 0.7rem;
+    }
+
+    /* Plaintext/text blocks - extra small for ASCII diagrams */
+    .prose pre code.language-plaintext,
+    .prose pre code.language-text {
+        font-size: 0.55rem;
+        line-height: 1.3;
+    }
+
+    /* Inline code */
+    .prose :not(pre) > code {
+        font-size: 0.85em;
+        padding: 0.1rem 0.2rem;
+    }
+
+    /* Lists - reduced indentation */
+    .prose ul,
+    .prose ol {
+        padding-left: 1.25rem;
+    }
+
+    /* Links - larger tap targets */
+    .prose a {
+        padding: 0.25rem 0;
+        display: inline;
+    }
+
+    /* Copy button - larger tap target */
+    .copy-button {
+        padding: 0.5rem;
+    }
+
+    /* ----------------------------------------
+       TAG FILTER BAR - Horizontal scroll
+       ---------------------------------------- */
+
+    .tag-filter-bar > div {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none; /* Firefox */
+        padding-bottom: 0.5rem; /* Space for scroll indicator */
+    }
+
+    .tag-filter-bar > div::-webkit-scrollbar {
+        display: none; /* Chrome/Safari */
+    }
+
+    /* Larger tap targets for tag pills */
+    .tag-pill {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.8125rem;
+    }
+
+    /* Active filter indicator - stack vertically */
+    #active-filters {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.5rem;
+    }
+
+    /* Images - full bleed on mobile */
+    .prose img {
+        margin-left: -1.5rem;
+        margin-right: -1.5rem;
+        max-width: calc(100% + 3rem);
+        width: calc(100% + 3rem);
     }
 }

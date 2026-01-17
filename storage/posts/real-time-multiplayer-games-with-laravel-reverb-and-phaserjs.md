@@ -14,7 +14,7 @@ This post walks through how I built a multiplayer game where authenticated users
 
 Here's the architecture we're working with:
 
-```
+```plaintext
 app/
 ├── Events/
 │   ├── PlayerJoined.php          # Broadcast when player enters
@@ -221,7 +221,7 @@ Every player knows who they are, the server validates that identity, and all pos
 
 Here's how a single movement propagates through the system:
 
-```
+```plaintext
 ┌─────────────────────────────────────────────────────────────────────┐
 │                         PLAYER A'S BROWSER                          │
 │  ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐ │

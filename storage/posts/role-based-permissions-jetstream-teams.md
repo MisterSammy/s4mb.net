@@ -18,7 +18,7 @@ This post walks through adapting Jetstream's permission system for this hybrid m
 
 Picture a coworking company with three locations: Downtown, Westside, and Midtown. Each location has its own staff - space managers who handle day-to-day operations - and members who pay for desk space and meeting rooms.
 
-```
+```plaintext
 ┌─────────────────────────────────────────────────────────────────────┐
 │                        COWORKING COMPANY                            │
 ├─────────────────────┬─────────────────────┬─────────────────────────┤

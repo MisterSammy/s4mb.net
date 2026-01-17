@@ -16,7 +16,7 @@ This post covers the technical implementation: how I structured the React Native
 
 The architecture is relatively straightforward:
 
-```
+```plaintext
 ┌─────────────────────────────────────┐
 │     React Native App (Expo)         │
 │     TypeScript + expo-router        │

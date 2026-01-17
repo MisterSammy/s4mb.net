@@ -4,6 +4,9 @@
 @section('meta_description', Str::limit($post->getDisplayExcerpt(), 160))
 
 @section('content')
+    {{-- Reading progress bar --}}
+    <div class="reading-progress" id="reading-progress"></div>
+
     {{-- Post Content Section --}}
     <main id="main-content" class="py-16 relative min-h-[400px]">
         {{-- Ruled lines decoration (left side) --}}
@@ -16,8 +19,8 @@
             </div>
         </div>
 
-        <div class="max-w-5xl mx-auto px-6 lg:px-8">
-            <article class="max-w-3xl mx-auto">
+        <div class="max-w-6xl mx-auto px-6 lg:px-8">
+            <article class="max-w-4xl mx-auto">
                 {{-- Post Meta --}}
                 <div class="flex items-center gap-4 mb-8">
                     <time class="font-mono text-xs text-[var(--color-text-muted)] tracking-widest" datetime="{{ $post->date->toIso8601String() }}">

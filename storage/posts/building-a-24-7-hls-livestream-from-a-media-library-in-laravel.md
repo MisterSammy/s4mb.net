@@ -16,7 +16,7 @@ This post walks through the system: how segments are generated, how playlists ar
 
 ## The Architecture
 
-```
+```plaintext
 INGESTION (once per video)
 Video File ──▶ FFmpeg ──▶ HLS Segments (stored permanently)
 
@@ -28,7 +28,7 @@ Videos are transcoded ahead of time. When a viewer requests the stream, Laravel 
 
 ### Storage Structure
 
-```
+```plaintext
 storage/app/streams/videos/
 ├── 1/
 │   ├── playlist.m3u8

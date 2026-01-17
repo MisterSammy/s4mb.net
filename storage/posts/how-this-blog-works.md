@@ -14,7 +14,7 @@ This blog is built with Laravel using a **file-based approach** - a departure fr
 
 Here's the file structure we'll be working with:
 
-```
+```plaintext
 app/
 ├── Data/
 │   └── Post.php                 # Data class
