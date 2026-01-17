@@ -4,6 +4,7 @@
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1">
         <meta name="description" content="@yield('description', 'An error occurred.')">
+        <link rel="icon" type="image/png" href="/favicon.png">
         <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
         <link rel="dns-prefetch" href="https://fonts.gstatic.com">
         <title>@yield('title') — {{ config('app.name', 'Sam') }}</title>

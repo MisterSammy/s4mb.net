@@ -23,6 +23,69 @@ A typical identity verification flow has four parts:
 3. **Embed the SDK** in your frontend for document upload and liveness checks
 4. **Handle webhooks** when verification completes or fails
 
+Here's how these pieces connect:
+
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                           VERIFICATION FLOW                                 │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+     YOUR INFRASTRUCTURE                          SUMSUB
+  ┌──────────────────────┐                  ┌──────────────────┐
+  │                      │                  │                  │
+  │   Laravel Backend    │                  │    SumSub API    │
+  │                      │                  │                  │
+  └──────────┬───────────┘                  └────────┬─────────┘
+             │                                       │
+             │  1. Create Applicant (POST)           │
+             │──────────────────────────────────────>│
+             │<─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │  applicant_id
+             │                                       │
+             │  2. Generate Access Token (POST)      │
+             │──────────────────────────────────────>│
+             │<─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │  short-lived token
+             │                                       │
+  ┌──────────┴───────────┐                  ┌────────┴─────────┐
+  │                      │                  │                  │
+  │   User's Browser     │                  │   SumSub SDK     │
+  │                      │                  │   (in browser)   │
+  └──────────┬───────────┘                  └────────┬─────────┘
+             │                                       │
+             │  3. Page loads with token             │
+             │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─> │
+             │                                       │
+             │  4. SDK renders verification UI       │
+             │<─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ │
+             │                                       │
+             │  5. User uploads docs, takes selfie   │
+             │  ════════════════════════════════════>│──┐
+             │                                       │  │ Documents sent
+             │                                       │  │ directly to SumSub
+             │  6. Token expires? Refresh via        │  │ (not through your
+             │     backend callback                  │  │ server)
+             │  ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─ ─> │<─┘
+             │                                       │
+  ┌──────────┴───────────┐                  ┌────────┴─────────┐
+  │                      │                  │                  │
+  │   Laravel Backend    │                  │  SumSub Backend  │
+  │                      │                  │  (async review)  │
+  └──────────┬───────────┘                  └────────┬─────────┘
+             │                                       │
+             │  7. Webhook: applicantReviewed        │
+             │<══════════════════════════════════════│  minutes to days
+             │     (GREEN/RED result)                   later
+             │                                       
+             │  8. Update database,                  
+             │     trigger events                    
+             ▼                                       
+
+  ══════  Secure channel (your data)
+  ─ ─ ─   Response / callback
+  ──────  API request
+```
+
+The key insight: **user documents never touch your servers**. The SDK uploads directly to SumSub, which handles PII storage and processing. You only receive the verification result via webhook.
+
 Let's implement each piece.
 
 ## Setting Up the Controller
