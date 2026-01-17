@@ -109,31 +109,33 @@ public function scopeStreamReady($query)
 The FFmpeg command converts videos to HLS segments:
 
 ```php
-$segmentDuration = 10;  // seconds per segment
+$outputDir = storage_path("app/streams/videos/{$video->id}");
+$playlistPath = "{$outputDir}/playlist.m3u8";
+$segmentPattern = "{$outputDir}/segment_%05d.ts";
+$progressFile = "{$outputDir}/progress.txt";
 
 $result = Process::run([
     'ffmpeg', '-i', $inputPath,
+    '-progress', $progressFile,  // For tracking transcode progress
     // Normalize video: 720p, maintain aspect ratio, pad to exact dimensions
-    '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2',
+    // Also normalize framerate and pixel format for consistent output
+    '-vf', 'scale=1280:720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30,format=yuv420p',
     // Video encoding
     '-c:v', 'libx264',
     '-preset', 'veryfast',
     '-crf', '23',
-    // Force keyframes at segment boundaries for clean cuts
-    '-g', (string) ($segmentDuration * 30),  // GOP = segment_duration * framerate
-    '-keyint_min', (string) ($segmentDuration * 30),
-    '-sc_threshold', '0',  // Disable scene change detection
-    // Audio encoding
+    // Audio normalization and encoding
+    '-af', 'loudnorm=I=-16:TP=-1.5:LRA=11',  // Normalize loudness across videos
     '-c:a', 'aac',
     '-b:a', '128k',
     '-ac', '2',
+    '-ar', '44100',  // Consistent sample rate
     // HLS options
-    '-hls_time', (string) $segmentDuration,
+    '-hls_time', '10',
     '-hls_list_size', '0',  // Keep ALL segments in playlist
-    '-hls_playlist_type', 'vod',  // Marks as complete (adds EXT-X-ENDLIST)
-    '-hls_segment_filename', "{$outputDir}/segment_%05d.ts",
+    '-hls_segment_filename', $segmentPattern,
     '-f', 'hls',
-    "{$outputDir}/playlist.m3u8",
+    $playlistPath,
 ]);
 ```
 
@@ -141,11 +143,11 @@ Let's break down the critical flags:
 
 **`-hls_list_size 0`**: By default, FFmpeg keeps only a rolling window of segments (5 by default). Setting this to `0` keeps all segments in the playlist permanently. This is essential—we need every segment to exist for random access.
 
-**`-hls_playlist_type vod`**: Tells FFmpeg this is a complete video, not a live stream. This adds `#EXT-X-ENDLIST` to the playlist and implicitly sets `hls_list_size` to 0.
+**`loudnorm` filter**: When playing videos back-to-back, inconsistent audio levels are jarring. The loudnorm filter normalizes audio to broadcast standards (-16 LUFS integrated loudness), so viewers don't need to adjust volume between videos.
 
-**`-g` and `-keyint_min`**: Force keyframes at regular intervals matching segment duration. HLS can only cut segments at keyframes, so this ensures consistent segment lengths. Without this, segments might be longer than expected.
+**`fps=30,format=yuv420p`**: Normalizes framerate and pixel format across all videos. Source videos may have varying framerates (24, 25, 29.97, 30, 60 fps), which can cause playback issues at video boundaries. Consistent encoding parameters ensure smooth transitions.
 
-**`-sc_threshold 0`**: Disables scene change detection for keyframe insertion. We want keyframes at predictable intervals, not wherever FFmpeg detects a scene change.
+**`-ar 44100`**: Sets a consistent audio sample rate. Like framerate, inconsistent sample rates between videos can cause audio glitches at transitions.
 
 After transcoding, parse the playlist to update the database:
 
@@ -175,7 +177,6 @@ The core of the system. On each request, calculate what should be playing and bu
 class StreamService
 {
     protected int $scheduleEpoch;
-    protected int $segmentDuration = 10;
 
     public function __construct()
     {
@@ -183,7 +184,7 @@ class StreamService
         $this->scheduleEpoch = Carbon::today('UTC')->timestamp;
     }
 
-    public function findCurrentPosition(): ?array
+    public function findCurrentPosition(int $timeAdjustment = 0): ?array
     {
         $videos = Video::streamReady()->orderBy('id')->get();
         if ($videos->isEmpty()) {
@@ -193,18 +194,24 @@ class StreamService
         $schedule = $this->buildSchedule($videos);
 
         // How far into the loop are we?
-        $elapsed = now()->utc()->timestamp - $this->scheduleEpoch;
+        // timeAdjustment allows offsetting to sync guide display with actual player position
+        $elapsed = now()->utc()->timestamp - $this->scheduleEpoch + $timeAdjustment;
         $position = fmod((float) $elapsed, $schedule['total_duration']);
 
         // Find which video is playing at this position
         foreach ($schedule['entries'] as $index => $entry) {
             if ($position >= $entry['start'] && $position < $entry['end']) {
                 $offset = $position - $entry['start'];
+                $video = $entry['video'];
+
+                // Calculate segment index from actual duration, not fixed value
+                $avgSegmentDuration = $video->hls_duration / max(1, $video->segment_count);
+
                 return [
-                    'video' => $entry['video'],
+                    'video' => $video,
                     'video_index' => $index,
                     'offset' => $offset,
-                    'segment_index' => (int) floor($offset / $this->segmentDuration),
+                    'segment_index' => (int) floor($offset / $avgSegmentDuration),
                     'schedule' => $schedule,
                 ];
             }
@@ -267,6 +274,16 @@ Why `mt_srand()`? PHP's Mersenne Twister PRNG produces identical sequences for t
 
 The shuffle changes daily (seed is `YYYYMMDD`), giving viewers variety while maintaining synchronization within each day.
 
+:::note
+The shuffle_daily approach shown here is just one option. The system can support multiple ordering modes:
+- **sequential**: Videos play in ID order
+- **shuffle_daily**: Random order frozen for the day (shown above)
+- **shuffle_always**: Random every request (viewers may see different orders)
+- **manual**: Curator-defined order via admin interface
+
+Each mode has trade-offs between predictability, variety, and editorial control. The daily shuffle balances variety with the shared viewing experience.
+:::
+
 ### Generating the Playlist
 
 Build the m3u8 content from the current position:
@@ -279,24 +296,61 @@ public function generateDynamicPlaylist(): ?string
         return null;
     }
 
-    // Collect segments: some behind (for buffering), more ahead
-    $segments = $this->collectSegments(
-        position: $position,
-        behind: 3,   // 30 seconds of buffer behind current position
-        ahead: 15    // 150 seconds ahead
-    );
+    $schedule = $position['schedule'];
+    $entries = $schedule['entries'];
+    $currentVideoIndex = $position['video_index'];
+    $currentSegmentIndex = $position['segment_index'];
+
+    // Configuration: how many segments behind/ahead to include
+    $segmentsBehind = config('streaming.live_segments_behind', 3);
+    $segmentsAhead = config('streaming.live_segments_ahead', 15);
+
+    // Calculate media sequence: count all segments up to current position
+    $mediaSequence = 0;
+    for ($i = 0; $i < $currentVideoIndex; $i++) {
+        $mediaSequence += $entries[$i]['video']->segment_count;
+    }
+    $mediaSequence += max(0, $currentSegmentIndex - $segmentsBehind);
+
+    // Collect segments from current and subsequent videos
+    $segments = [];
+    $segmentsNeeded = $segmentsBehind + $segmentsAhead;
+    $startSegment = max(0, $currentSegmentIndex - $segmentsBehind);
+    $videoIndex = $currentVideoIndex;
+
+    while (count($segments) < $segmentsNeeded && $videoIndex < count($entries)) {
+        $video = $entries[$videoIndex]['video'];
+        $segmentStart = ($videoIndex === $currentVideoIndex) ? $startSegment : 0;
+
+        // Read actual durations from the HLS playlist file
+        $segmentDurations = $this->getSegmentDurations($video);
+
+        for ($seg = $segmentStart; $seg < $video->segment_count && count($segments) < $segmentsNeeded; $seg++) {
+            $segments[] = [
+                'video_id' => $video->id,
+                'segment_index' => $seg,
+                'duration' => $segmentDurations[$seg] ?? 10.0,
+            ];
+        }
+
+        $videoIndex++;
+
+        // Handle looping back to first video
+        if ($videoIndex >= count($entries) && count($segments) < $segmentsNeeded) {
+            $videoIndex = 0;
+        }
+    }
 
     if (empty($segments)) {
         return null;
     }
 
-    // Calculate media sequence number
-    // This must increment monotonically as segments "fall off" the playlist
-    $mediaSequence = $this->calculateMediaSequence($position);
+    // Build playlist
+    $maxDuration = (int) ceil(max(array_column($segments, 'duration')));
 
     $playlist = "#EXTM3U\n";
     $playlist .= "#EXT-X-VERSION:3\n";
-    $playlist .= "#EXT-X-TARGETDURATION:{$this->segmentDuration}\n";
+    $playlist .= "#EXT-X-TARGETDURATION:{$maxDuration}\n";
     $playlist .= "#EXT-X-MEDIA-SEQUENCE:{$mediaSequence}\n";
 
     $lastVideoId = null;
@@ -307,8 +361,8 @@ public function generateDynamicPlaylist(): ?string
         }
         $lastVideoId = $seg['video_id'];
 
-        $playlist .= "#EXTINF:{$seg['duration']},\n";
-        $playlist .= "videos/{$seg['video_id']}/segment_{$seg['index']}.ts\n";
+        $playlist .= sprintf("#EXTINF:%.6f,\n", $seg['duration']);
+        $playlist .= sprintf("videos/%d/segment_%05d.ts\n", $seg['video_id'], $seg['segment_index']);
     }
 
     return $playlist;
@@ -317,115 +371,42 @@ public function generateDynamicPlaylist(): ?string
 
 A few important details here:
 
-**`EXT-X-MEDIA-SEQUENCE`**: This number identifies the first segment in the playlist. For live streams, it must increase monotonically as old segments are removed. Players use this to detect playlist updates and avoid re-downloading segments.
+**`EXT-X-MEDIA-SEQUENCE`**: This number identifies the first segment in the playlist. For live streams, it must increase monotonically as old segments are removed. Players use this to detect playlist updates and avoid re-downloading segments. We calculate it by counting all segments before the current position.
 
 **`EXT-X-DISCONTINUITY`**: This tag signals that the next segment has different encoding parameters—different video, codec settings, timestamps, etc. Without it, players may glitch or fail when crossing video boundaries. The HLS spec requires this whenever there's a significant change in encoding characteristics.
 
 **No `EXT-X-ENDLIST`**: Omitting this tag tells players this is a live stream. They'll periodically re-fetch the playlist to discover new segments.
 
-### Collecting Segments Across Video Boundaries
+### Reading Segment Durations from the Playlist
 
-The segment collection needs to handle wrapping across videos and across the entire schedule:
+Rather than estimating segment durations, read them directly from the generated HLS playlist:
 
 ```php
-protected function collectSegments(array $position, int $behind, int $ahead): array
+protected function getSegmentDurations(Video $video): array
 {
-    $segments = [];
-    $schedule = $position['schedule'];
-    $totalSegments = $behind + $ahead + 1;
-    
-    // Start position: current segment minus buffer
-    $currentVideoIndex = $position['video_index'];
-    $currentSegmentIndex = $position['segment_index'] - $behind;
-    
-    // Handle negative segment index (need previous video)
-    while ($currentSegmentIndex < 0) {
-        $currentVideoIndex--;
-        if ($currentVideoIndex < 0) {
-            $currentVideoIndex = count($schedule['entries']) - 1;  // Wrap to end
-        }
-        $video = $schedule['entries'][$currentVideoIndex]['video'];
-        $currentSegmentIndex += $video->segment_count;
+    $playlistPath = storage_path("app/streams/videos/{$video->id}/playlist.m3u8");
+
+    if (!file_exists($playlistPath)) {
+        // Fallback to default durations if playlist missing
+        return array_fill(0, $video->segment_count, 10.0);
     }
-    
-    // Collect segments
-    $collected = 0;
-    while ($collected < $totalSegments) {
-        $entry = $schedule['entries'][$currentVideoIndex];
-        $video = $entry['video'];
-        
-        // Get segment duration from stored playlist or estimate
-        $duration = $this->getSegmentDuration($video, $currentSegmentIndex);
-        
-        $segments[] = [
-            'video_id' => $video->id,
-            'index' => str_pad($currentSegmentIndex, 5, '0', STR_PAD_LEFT),
-            'duration' => number_format($duration, 6),
-        ];
-        
-        $currentSegmentIndex++;
-        $collected++;
-        
-        // Move to next video if we've exhausted segments
-        if ($currentSegmentIndex >= $video->segment_count) {
-            $currentSegmentIndex = 0;
-            $currentVideoIndex++;
-            if ($currentVideoIndex >= count($schedule['entries'])) {
-                $currentVideoIndex = 0;  // Wrap to beginning
+
+    $content = file_get_contents($playlistPath);
+    $durations = [];
+
+    foreach (explode("\n", $content) as $line) {
+        if (str_starts_with($line, '#EXTINF:')) {
+            if (preg_match('/#EXTINF:([\d.]+)/', $line, $matches)) {
+                $durations[] = (float) $matches[1];
             }
         }
     }
-    
-    return $segments;
-}
 
-protected function getSegmentDuration(Video $video, int $index): float
-{
-    // For accuracy, you could store individual segment durations
-    // For simplicity, use target duration (last segment may be shorter)
-    if ($index === $video->segment_count - 1) {
-        // Last segment: calculate from total duration
-        $fullSegments = $video->segment_count - 1;
-        return $video->hls_duration - ($fullSegments * $this->segmentDuration);
-    }
-    
-    return (float) $this->segmentDuration;
+    return $durations ?: array_fill(0, $video->segment_count, 10.0);
 }
 ```
 
-### Calculating Media Sequence
-
-The media sequence must be globally consistent and monotonically increasing:
-
-```php
-protected function calculateMediaSequence(array $position): int
-{
-    // Total segments that have "played" since epoch
-    $schedule = $position['schedule'];
-    $elapsed = now()->utc()->timestamp - $this->scheduleEpoch;
-    
-    // How many complete schedule loops?
-    $completeLoops = (int) floor($elapsed / $schedule['total_duration']);
-    
-    // Total segments in one complete loop
-    $segmentsPerLoop = array_sum(
-        array_map(fn($e) => $e['video']->segment_count, $schedule['entries'])
-    );
-    
-    // Segments from complete loops
-    $sequenceFromLoops = $completeLoops * $segmentsPerLoop;
-    
-    // Segments from current partial loop (up to current position)
-    $segmentsInCurrentLoop = 0;
-    for ($i = 0; $i < $position['video_index']; $i++) {
-        $segmentsInCurrentLoop += $schedule['entries'][$i]['video']->segment_count;
-    }
-    $segmentsInCurrentLoop += $position['segment_index'];
-    
-    // Subtract buffer segments (we include some segments behind current position)
-    return max(0, $sequenceFromLoops + $segmentsInCurrentLoop - 3);
-}
-```
+This approach is more accurate than estimating. While most segments are close to the target duration (10 seconds), the last segment of each video is typically shorter, and keyframe alignment can cause slight variations. Reading the actual `#EXTINF` values ensures the dynamic playlist has correct timing.
 
 ## Serving the Stream
 
@@ -496,51 +477,60 @@ Track what's currently streaming with a progress indicator:
 // StreamService.php
 public function getNowPlaying(): ?object
 {
-    $position = $this->findCurrentPosition();
+    // Advance the guide position to match where HLS.js is actually playing
+    // The playlist window and player buffering create an offset between
+    // "current time" and what the viewer sees on screen
+    $guideAdvance = $this->calculateGuideAdvanceSeconds();
+    $position = $this->findCurrentPosition($guideAdvance);
+
     if (!$position) {
         return null;
     }
 
     $video = $position['video'];
-    $nextVideo = $this->getNextVideo($position);
+    $offset = $position['offset'];
 
     return (object) [
         'video' => $video,
-        'video_title' => $video->title,
+        'video_title' => $video->video_title,
         'thumbnail_url' => $video->thumbnail_url,
-        'position' => $this->formatDuration((int) $position['offset']),
+        'position' => $this->formatDuration((int) $offset),
         'duration' => $this->formatDuration((int) $video->hls_duration),
-        'progress_percent' => min(100, round(($position['offset'] / $video->hls_duration) * 100, 1)),
-        'time_remaining' => (int) ceil($video->hls_duration - $position['offset']),
-        'next_video' => $nextVideo?->title,
+        'progress_percent' => ($video->hls_duration > 0)
+            ? round(($offset / $video->hls_duration) * 100, 1)
+            : 0,
     ];
 }
 
-protected function getNextVideo(array $position): ?Video
+protected function calculateGuideAdvanceSeconds(): int
 {
-    $entries = $position['schedule']['entries'];
-    $nextIndex = $position['video_index'] + 1;
-    
-    if ($nextIndex >= count($entries)) {
-        $nextIndex = 0;
-    }
-    
-    return $entries[$nextIndex]['video'] ?? null;
+    // The HLS playlist includes segments behind and ahead of "current time"
+    // HLS.js plays a few segments back from the live edge (liveSyncDurationCount)
+    // This calculates the net offset so the guide shows what's actually playing
+    $segmentsBehind = config('streaming.live_segments_behind', 3);
+    $segmentsAhead = config('streaming.live_segments_ahead', 15);
+    $liveSyncSegments = config('streaming.player_live_sync_segments', 3);
+    $segmentDuration = 10;
+
+    $netSegmentOffset = ($segmentsAhead - $segmentsBehind) - $liveSyncSegments;
+    return (int) ($netSegmentOffset * $segmentDuration);
 }
 
 protected function formatDuration(int $seconds): string
 {
     if ($seconds >= 3600) {
-        return sprintf('%d:%02d:%02d', 
+        return sprintf('%d:%02d:%02d',
             intdiv($seconds, 3600),
             intdiv($seconds % 3600, 60),
             $seconds % 60
         );
     }
-    
+
     return sprintf('%d:%02d', intdiv($seconds, 60), $seconds % 60);
 }
 ```
+
+The guide sync calculation is subtle but important. When a viewer looks at the "Now Playing" widget, it should match what they're actually seeing in the player—not what the server calculates as "current." The HLS protocol's segment windowing and player-side buffering create an offset that needs compensation.
 
 ### Dashboard Controller
 

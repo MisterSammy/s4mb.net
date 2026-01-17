@@ -54,8 +54,8 @@
                         {{-- Logo/Avatar --}}
                         <div class="flex items-center gap-3">
                             <a href="{{ url('/') }}" class="corner-brackets">
-                                <div class="w-8 h-8 bg-[var(--color-darkest)] flex items-center justify-center pixel-shadow">
-                                    <span class="text-[var(--color-background)] text-sm font-medium">S</span>
+                                <div class="w-8 h-8 flex items-center justify-center overflow-hidden">
+                                    <img src="/favicon.png" alt="{{ config('app.name', 'Sam') }}" class="w-full h-full object-cover">
                                 </div>
                             </a>
                         </div>
