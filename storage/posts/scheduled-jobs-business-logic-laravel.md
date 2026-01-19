@@ -1,6 +1,6 @@
 ---
 title: "Scheduled Jobs for Business Logic: Automatic Expiration and Reminder Systems"
-date: 2025-01-09
+date: 2025-11-24
 excerpt: "Not everything happens on user interaction. Here's how to build scheduled jobs that enforce business rules like rental expiration and reminder emails."
 tags: [laravel, scheduling, jobs, automation, business-logic]
 slug: scheduled-jobs-business-logic-laravel

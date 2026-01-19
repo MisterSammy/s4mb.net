@@ -1,6 +1,6 @@
 ---
 title: "A State Machine Without a State Machine Library"
-date: 2025-01-09
+date: 2026-01-07
 excerpt: "PHP 8.1 enums with transition methods give you a production-ready state machine pattern. Type-safe, testable, and dependency-free - perfect for Laravel applications."
 tags: [laravel, php, architecture, enums, workflow]
 slug: a-state-machine-without-a-state-machine-library

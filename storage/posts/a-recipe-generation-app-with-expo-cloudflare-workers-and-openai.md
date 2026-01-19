@@ -1,6 +1,6 @@
 ---
 title: "A Recipe Generation App with Expo, Cloudflare Workers, and OpenAI"
-date: 2026-01-09
+date: 2026-01-13
 excerpt: "A technical walkthrough of building a React Native recipe app with Expo, Cloudflare Workers for the backend, and OpenAI GPT-4o for recipe generation. Covers architecture decisions, rate limiting with KV storage, schema migrations in SQLite, and prompt engineering."
 tags: [react-native, expo, cloudflare-workers, openai, typescript, sqlite, architecture]
 slug: a-recipe-generation-app-with-expo-cloudflare-workers-and-openai

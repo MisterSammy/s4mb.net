@@ -1,6 +1,6 @@
 ---
 title: "Polymorphic Notes: One Table for Comments Across Multiple Models"
-date: 2025-01-09
+date: 2025-11-17
 excerpt: "Instead of creating separate note tables for properties, tenants, and work orders, use Laravel's polymorphic relationships to build one flexible notes system."
 tags: [laravel, eloquent, polymorphic, database-design]
 slug: polymorphic-notes-laravel

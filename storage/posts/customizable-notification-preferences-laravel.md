@@ -1,6 +1,6 @@
 ---
 title: "Building a Customizable Notification System with User Preferences"
-date: 2025-01-09
+date: 2025-12-15
 excerpt: "Use PHP backed enums as your source of truth for notification types instead of database tables. Type-safe, scalable, and zero migration overhead when adding new types."
 tags: [laravel, notifications, livewire, user-experience, php-enums]
 slug: customizable-notification-preferences-laravel

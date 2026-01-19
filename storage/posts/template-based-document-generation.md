@@ -1,6 +1,6 @@
 ---
 title: "Template-Based Document Generation in Laravel"
-date: 2025-01-09
+date: 2025-12-22
 excerpt: "Pre-fill complex forms from templates so users customize rather than create from scratch. A pattern for proposals, packages, and contracts."
 tags: [laravel, templates, forms, ux]
 slug: template-based-document-generation

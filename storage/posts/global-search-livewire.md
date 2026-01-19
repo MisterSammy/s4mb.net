@@ -1,6 +1,6 @@
 ---
 title: "Building a Global Search Component with Livewire"
-date: 2025-01-09
+date: 2025-12-28
 excerpt: "A practical MySQL-based global search component using Livewire. Suitable for prototypes and small datasets."
 tags: [laravel, livewire, search, components]
 slug: global-search-livewire

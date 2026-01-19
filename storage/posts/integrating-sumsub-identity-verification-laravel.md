@@ -1,6 +1,6 @@
 ---
 title: "Integrating Third-Party Identity Verification (SumSub) into Laravel"
-date: 2025-01-09
+date: 2026-01-03
 excerpt: "Identity verification is a black box until you have to build it. Here's how to integrate SumSub's KYC service with webhooks, token refresh, and graceful error handling."
 tags: [laravel, integration, kyc, verification, api]
 slug: integrating-sumsub-identity-verification-laravel

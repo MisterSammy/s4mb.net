@@ -1,6 +1,6 @@
 ---
 title: "IP Whitelisting for Laravel Admin Panels"
-date: 2025-01-09
+date: 2025-12-01
 excerpt: "Not everyone needs access to your admin panel from everywhere. Here's how to restrict sensitive routes to known IP addresses using Laravel Firewall."
 tags: [laravel, security, admin, firewall]
 slug: ip-whitelisting-laravel-admin

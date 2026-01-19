@@ -1,6 +1,6 @@
 ---
 title: "Attribute-Level Events in Laravel: Package vs. Native Approaches"
-date: 2025-01-09
+date: 2025-12-08
 excerpt: "Model events are great, but what if you need to fire events only when specific attributes change? Here's two approaches - one with a package, one native."
 tags: [laravel, events, eloquent, php, architecture]
 slug: attribute-level-events-laravel

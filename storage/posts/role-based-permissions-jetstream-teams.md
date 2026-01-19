@@ -1,6 +1,6 @@
 ---
 title: "Role-Based Permissions in Multi-Tenant Laravel with Jetstream Teams"
-date: 2025-01-09
+date: 2025-11-10
 excerpt: "Jetstream's team feature is often used for organizations. Here's how to use it for a coworking space where staff manage spaces and members book rooms."
 tags: [laravel, jetstream, permissions, multi-tenant, teams]
 slug: role-based-permissions-jetstream-teams

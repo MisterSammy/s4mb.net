@@ -1,6 +1,6 @@
 ---
 title: "How This Blog Works: A Laravel-Powered Markdown Blog"
-date: 2025-01-15
+date: 2025-11-03
 excerpt: "Why reach for a JavaScript static site generator when you already know Laravel? This post walks through how to build a file-based markdown blog using the framework you already use."
 tags: [laravel, markdown, architecture, php, tutorial]
 slug: how-this-blog-works

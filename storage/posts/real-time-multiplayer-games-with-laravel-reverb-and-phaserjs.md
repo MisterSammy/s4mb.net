@@ -1,6 +1,6 @@
 ---
 title: "Real-Time Multiplayer Games with Laravel Reverb and Phaser.js"
-date: 2026-01-09
+date: 2026-01-10
 excerpt: "You don't need a Node.js backend or a dedicated game server to build multiplayer browser games. This post shows how Laravel Reverb and Phaser.js combine to create a real-time multiplayer experience using the stack you already know."
 tags: [laravel, websockets, reverb, phaser, multiplayer, tutorial]
 slug: real-time-multiplayer-games-with-laravel-reverb-and-phaserjs
