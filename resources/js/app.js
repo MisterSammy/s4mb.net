@@ -14,6 +14,8 @@ import diff from 'highlight.js/lib/languages/diff';
 import typescript from 'highlight.js/lib/languages/typescript';
 import plaintext from 'highlight.js/lib/languages/plaintext';
 import ini from 'highlight.js/lib/languages/ini';
+import yaml from 'highlight.js/lib/languages/yaml';
+import dockerfile from 'highlight.js/lib/languages/dockerfile';
 
 hljs.registerLanguage('php', php);
 hljs.registerLanguage('javascript', javascript);
@@ -28,6 +30,8 @@ hljs.registerLanguage('plaintext', plaintext);
 hljs.registerLanguage('text', plaintext);
 hljs.registerLanguage('ini', ini);
 hljs.registerLanguage('env', ini);
+hljs.registerLanguage('yaml', yaml);
+hljs.registerLanguage('dockerfile', dockerfile);
 
 // Highlight code blocks only within .prose containers (blog post content)
 // This excludes decorative code blocks like ASCII art on the homepage

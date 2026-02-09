@@ -8,9 +8,9 @@ slug: a-recipe-generation-app-with-expo-cloudflare-workers-and-openai
 
 I built a recipe generation app over the past few weeks, and I wanted to share what I learned about the architecture and some of the interesting technical challenges I ran into. The app is straightforward in concept: you tell it what ingredients you have in your kitchen, specify any dietary preferences or time constraints, and it generates recipes you can actually make. But as with most seemingly simple projects, the devil's in the details.
 
-The real goal here was to build something practical that I'd actually use. I've tried other recipe apps before, and they always seemed to suggest dishes that required ingredients I'd never heard of or techniques that assumed I had a culinary degree. So I wanted something that understood the difference between "I'm making breakfast before work" and "I'm planning a fancy dinner party." The AI needed to match my reality, not some aspirational cooking show version of it.
+The real goal here was to learn an effective stack for creating AI-powered apps, which are sometimes referred to (sometimes disparagingly) as "GPT wrappers". A key aspect I was interested in is to find out how well an LLM can extract structured data (a delimited list of ingredients) from unstructured human input. Secondly, I wanted to explore RevenueCat as a service for monetizing AI-powered apps. 
 
-This post covers the technical implementation: how I structured the React Native app with Expo, why I chose Cloudflare Workers for the backend, and how I engineered the prompts to get GPT-4o to generate sensible recipes instead of suggesting prosciutto-wrapped everything. I'll also walk through some of the more interesting challenges, like migrating SQLite schemas without breaking existing data, handling speech recognition in development builds, and rate limiting with KV storage.
+This post covers the technical implementation: how I structured the React Native app with Expo, why I chose Cloudflare Workers for the backend, and how I engineered the prompts to get GPT-4o to generate sensible recipes instead of suggesting prosciutto-wrapped everything. I'll also walk through some of the more interesting challenges, like handling speech recognition in development builds, and rate limiting with KV storage.
 
 ## The Stack
 
@@ -42,7 +42,7 @@ The architecture is relatively straightforward:
 
 **Cloudflare Workers** became the backend because OpenAI API keys can't live in a mobile app. Someone would extract them from the binary within hours. Workers are globally distributed, have a generous free tier (which matters for a side project), and KV storage turned out to be a perfect fit for rate limiting counters and caching subscription status.
 
-**OpenAI's GPT-4o** handles recipe generation. I initially tried building a rule-based system with a recipe database, but it quickly became unwieldy. The AI approach lets me handle dietary restrictions, time constraints, and ingredient substitutions in natural language. The key was getting the prompts right - more on that later.
+**OpenAI's GPT-4o** handles recipe generation.  The key was getting the prompts exactly right - more on that later.
 
 **RevenueCat** manages in-app subscriptions. I didn't want to deal with App Store receipt validation myself, and RevenueCat abstracts that complexity while providing a unified API across platforms.
 
@@ -527,26 +527,13 @@ The retry logic only retries 5xx server errors, not 4xx client errors or 429 rat
 
 ## Lessons Learned
 
-### Rate Limiting During Development
+### Speech Recognition and TTS
 
-During development, I didn't have an active subscription, so the backend treated me as a non-subscriber with a strict 10-requests-per-hour limit. I hit the limit constantly while testing.
-
-The workaround was temporarily raising the limit:
-
-```typescript
-nonSubscribers: {
-  maxRequests: 999, // Temporarily raised for testing (normally 10)
-  windowMs: 3600000,
-}
-```
-
-Of course, I nearly forgot to lower it before launch. A pre-launch checklist or environment variable would have been smarter.
+Native TTS on iOS is _terrible_ compared to AI. It frequently gets words wrong, whereas AI can infer the context of the word and return the correct one, even if it's difficult to make out. If I were to launch this project I'd use an API for speech recognition. 
 
 ### Entitlement ID Matching
 
-The RevenueCat entitlement ID must match exactly (case-sensitive) in three places: the client app, the backend `wrangler.toml`, and the RevenueCat dashboard. Any mismatch causes silent failures where paying users can't access premium features.
-
-This is the kind of bug that's obvious in retrospect but took me hours to find. Document your entitlement IDs and verify all three locations before deploying.
+The RevenueCat entitlement ID must match exactly (case-sensitive) in three places: the client app, the backend `wrangler.toml`, and the RevenueCat dashboard. Any mismatch causes silent failures where paying users can't access premium features. Document your entitlement IDs and verify all three locations before deploying.
 
 ### Cloudflare Workers Deployment
 
@@ -556,7 +543,7 @@ If your `wrangler.toml` defines a production environment, you must deploy with:
 npx wrangler deploy --env production
 ```
 
-Without `--env production`, the KV namespaces and secrets aren't available. The deployment succeeds, but the worker fails at runtime. This is easy to miss because the deployment itself doesn't error - the worker just can't access required resources.
+Without `--env production`, the KV namespaces and secrets aren't available. The deployment succeeds, but the worker fails at runtime. This is easy to miss because the deployment itself doesn't error; the worker just can't access required resources.
 
 ## When This Stack Works
 
@@ -576,8 +563,7 @@ Consider alternatives if:
 
 ## Final Thoughts
 
-This project reinforced a few things for me. First, AI is excellent at tasks with fuzzy requirements - generating recipes based on "whatever's in my fridge" is exactly the kind of problem that's tedious to solve with rules but natural for language models. Second, prompt engineering matters more than I initially expected. The difference between a good and bad prompt isn't subtle - it's the difference between "pan-seared duck breast with shallot confit" and "chicken tacos with stuff you already have."
+Firstly, while this approach "works", it certainly could be easier to make AI-powered native apps and I believe it will in future. It occurred to me that Expo + React Native were created to allow web developers to port their skillset to mobile without having to learn a new language like Swift or Kotlin. The trade-off was that React Native apps could feel more janky than a purely native app, without the considerable effort of multiple engineers. 
+With the rapid evolution of automated coding, I don't believe these kind of trade-offs are necessary any more. A competent web developer could probably get a fully native app built without too many issues by guiding their coding agent until it works.
 
-And finally, there's something satisfying about building tools you actually use. This app lives on my phone, and I've used it dozens of times since building it. That's the real test of whether something works: not whether it's technically impressive, but whether you reach for it when you need it.
-
-The code is deployed and serving users. It has error handling, retry logic, and graceful degradation when services are unavailable. It's not perfect, but it's solid enough that I trust it with real usage. And honestly, that's all I was aiming for.
+Finally, AI is excellent at tasks with fuzzy requirements. Generating recipes based on "whatever's in my fridge" is exactly the kind of problem that's tedious to solve with rules but natural for language models. Prompt engineering matters more than I initially expected. The difference between a good and bad prompt is the difference between "pan-seared duck breast with shallot confit" and "chicken tacos with what's in your fridge."
