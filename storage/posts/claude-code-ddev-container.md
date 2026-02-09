@@ -14,6 +14,8 @@ I've seen some unfortunate incidents posted online where Claude has gone haywire
 
 One approach to containing this is running Claude Code inside an isolated environment. Emil Burzo wrote about doing this with a Vagrant VM (https://blog.emilburzo.com/2026/01/running-claude-code-dangerously-safely/). Thanks for the inspiration, Emil. This guide uses Docker containers via DDEV, with VS Code attached directly to the container.
 
+DDEV is an open-source tool that makes local PHP development trivial. It wraps Docker Compose behind a simple CLI — run `ddev start` and you get a fully configured web server, database, and PHP environment in seconds. It supports Laravel, WordPress, Drupal, and more, with trusted HTTPS, automatic database configuration, and per-project isolation out of the box.
+
 ---
 
 ## Why Use This?
@@ -68,10 +70,6 @@ You need two extensions:
 
 Install both from the VS Code Extensions panel.
 
-### 4. Get an Anthropic API Key
-
-You'll need an API key from https://console.anthropic.com. Keep it handy for the setup steps below.
-
 ---
 
 ## Quick Start
@@ -85,7 +83,7 @@ cd ~/code/myproject
 ddev config --project-type=laravel --docroot=public
 ```
 
-Open `.ddev/config.yaml` and set the Node.js version. Claude Code requires Node.js 20 or higher:
+Open `.ddev/config.yaml` and set the Node.js version. Node.js 18+ is needed for Laravel's Vite tooling (Claude Code itself installs as a standalone binary and doesn't require Node.js at runtime):
 
 ```yaml
 nodejs_version: "20"
@@ -108,19 +106,24 @@ composer_version: "2"
 
 ### 2. Install Claude Code in the container
 
-DDEV lets you extend its web container image with custom Dockerfiles. Create the file `.ddev/web-build/Dockerfile`:
+DDEV lets you extend its web container image with custom Dockerfiles. Create the file `.ddev/web-build/Dockerfile.claude`:
 
 ```dockerfile
-RUN curl -fsSL https://claude.ai/install.sh | bash
+# Install Claude Code CLI into the web container
+RUN curl -fsSL https://claude.ai/install.sh | bash \
+    && cp /root/.local/bin/claude /usr/local/bin/claude \
+    && rm -rf /root/.local/bin/claude
 ```
 
-That's it  -  one line. This uses the official installer recommended by Anthropic (npm installation is deprecated). The Dockerfile gets appended to DDEV's own image build during `ddev start`.
+This uses the official installer recommended by Anthropic (npm installation is deprecated). The extra `cp` step is important: the installer drops the binary in `/root/.local/bin/`, but when you `ddev ssh` into the container you're a different user and that path isn't on your `PATH`. Copying to `/usr/local/bin` makes `claude` available to all users.
 
-### 3. Set your API key
+Using a named Dockerfile (`Dockerfile.claude` rather than just `Dockerfile`) is good DDEV practice — DDEV processes all Dockerfiles in `web-build/` alphabetically, so a descriptive name avoids conflicts with other customizations. The Dockerfile gets appended to DDEV's own image build during `ddev start`.
 
-If you have a Claude Pro/Max plan you might not need to do this, the extension can log in via web. However, if you do want to set system variables in the container, here's how you do it.
+### 3. Set your API key (optional — API billing users only)
 
-Create `.ddev/config.local.yaml` for environment variables you don't want in version control:
+If you have a Claude Pro or Max subscription, you can skip this step entirely — you'll authenticate interactively with `claude login` on first run.
+
+If you're using the Anthropic API with your own billing, create `.ddev/config.local.yaml` for environment variables you don't want in version control:
 
 ```yaml
 web_environment:
@@ -142,11 +145,10 @@ The first start takes longer because Docker builds the custom image with Claude 
 ```bash
 ddev ssh
 claude --version
-node --version
 exit
 ```
 
-Confirm Claude Code is installed and Node.js is version 20 or higher.
+Confirm Claude Code is installed and the version prints correctly.
 
 ### 6. Attach VS Code to the container
 
@@ -171,7 +173,26 @@ cd /var/www/html
 claude --dangerously-skip-permissions
 ```
 
+If this is your first run and you haven't set an API key, Claude will prompt you to authenticate. Run `claude login` and follow the browser-based OAuth flow to sign in with your Claude Pro/Max account.
+
 `/var/www/html` is where DDEV mounts your project. Claude Code can freely modify your project files but cannot escape the container to reach your host filesystem.
+
+---
+
+## Multi-line Input in the Container
+
+If you're used to pressing Shift+Enter to insert newlines in Claude Code's TUI, you'll notice it doesn't work inside the container. This affects `ddev ssh`, direct SSH, and any terminal session running inside Docker  -  it's not specific to your terminal emulator.
+
+**Why it happens**: Claude Code v2.1+ detects your terminal type to enable Shift+Enter automatically in iTerm2, WezTerm, Ghostty, and Kitty. But it checks the `TERM` variable on the *remote* machine  -  inside the container that's just `xterm`, not your actual terminal. So the special key handling never kicks in. This is a [known upstream issue](https://github.com/anthropics/claude-code/issues/16859).
+
+**Workarounds that work reliably in the container:**
+
+| Method | How |
+|--------|-----|
+| `Ctrl+J` | Press Ctrl+J to insert a newline. This sends an ASCII line feed directly  -  it works over SSH, docker exec, and tmux without any configuration. |
+| `\` then Enter | Type a backslash and press Enter. This is Claude Code's built-in escape for newlines and works everywhere. |
+
+`Ctrl+J` is the closest to the native Shift+Enter feel. Once the upstream fix lands, Shift+Enter should just work.
 
 ---
 
@@ -279,6 +300,7 @@ Hot module replacement will work at `https://myproject.ddev.site:5173`.
 | `ddev launch` | Open the site in your browser |
 | `ddev describe` | Show project info, URLs, and ports |
 | `ddev poweroff` | Stop all DDEV projects |
+| `ddev debug rebuild` | Force a clean image rebuild (useful after Dockerfile changes) |
 | `ddev delete` | Remove the project containers (keeps files) |
 
 ---
@@ -374,7 +396,7 @@ Note that tmux sessions do not survive `ddev restart`.
 
 - Never store production credentials in your local `.env`
 - Don't mount additional host directories into DDEV
-- Use `.ddev/config.local.yaml` (gitignored) for your API key, not `config.yaml`
+- If using an API key, store it in `.ddev/config.local.yaml` (gitignored), not `config.yaml`
 - For maximum isolation, consider the official Claude Code devcontainer with firewall rules: https://github.com/anthropics/claude-code/tree/main/.devcontainer
 
 ---
@@ -405,15 +427,21 @@ If issues persist, check for port conflicts with `ddev describe` or try `ddev re
 ```bash
 ddev ssh
 which claude
-node --version         # Must be 20+
 ```
 
-If `claude` is missing, the custom Dockerfile may not have been built. Rebuild:
+If `claude` is missing, the most common cause is a PATH issue: the installer places the binary in `/root/.local/bin/`, which isn't on your PATH when you `ddev ssh` into the container. The fix is to ensure your `Dockerfile.claude` copies the binary to `/usr/local/bin` (see step 2 above).
+
+If the Dockerfile is correct but the image is stale, force a clean rebuild:
 
 ```bash
-ddev stop
-ddev start
+ddev debug rebuild
 ```
+
+This rebuilds the Docker image from scratch, ensuring your Dockerfile changes are applied.
+
+### Shift+Enter doesn't insert a newline
+
+This is expected inside the container. See [Multi-line Input in the Container](#multi-line-input-in-the-container) above  -  use `Ctrl+J` or `\` then Enter instead.
 
 ### Port conflicts
 
@@ -480,7 +508,7 @@ Then `ddev restart`.
 nodejs_version: "22"
 ```
 
-Then `ddev restart`. Make sure it's 20 or higher for Claude Code.
+Then `ddev restart`.
 
 ### Multiple projects
 
