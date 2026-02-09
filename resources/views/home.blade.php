@@ -82,10 +82,9 @@
                     <div class="font-mono text-sm text-[var(--color-text-muted)]">
                         <span class="font-bold">1996</span> <span class="mx-2">·</span> <span>💾</span> built a game in BASIC on the Amstrad CPC 464
                     </div>
-                    <!-- <div class="font-mono text-sm text-[var(--color-text-muted)]">
-                        <span class="font-bold">1999</span> <span class="mx-2">·</span> <span>🎮</span> Played a lot of AoE on Win98 and N64 and got internet. Then life happened
-                    </div> -->
-
+                    <div class="font-mono text-sm text-[var(--color-text-muted)]">
+                        <span class="font-bold">2014</span> <span class="mx-2">·</span> <span>🌐</span> <a href="https://www.intouchcrm.com/" target="_blank" rel="noopener" class="text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors">InTouchCRM</a> — built custom WordPress sites for businesses and councils around the UK
+                    </div>
                     <div class="font-mono text-sm text-[var(--color-text-muted)]">
                         <span class="font-bold">2017</span> <span class="mx-2">·</span> <span>📦</span> <a href="https://www.huboo.com" target="_blank" rel="noopener" class="text-[var(--color-text)] hover:text-[var(--color-accent)] transition-colors">New Vision</a> — modernized legacy PHP systems and architected real-time API middleware for e-commerce platforms
                     </div>
