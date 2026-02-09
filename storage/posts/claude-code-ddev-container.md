@@ -6,7 +6,9 @@ tags: [local-development, claude-code, php, docker, ddev]
 slug: claude-code-ddev-container
 ---
 
-Claude Code is powerful, but running it with `--dangerously-skip-permissions` on your Mac means it has unrestricted access to your entire filesystem  -  SSH keys, dotfiles, credentials, other projects, everything. 
+Claude Code is powerful but once you start using it regularly for development, the constant permissions checks start to be a drag. They pause execution while waiting for your input, so it can disrupt the flow of your work.
+
+Running Claude with the `--dangerously-skip-permissions` flag means you have the option to YOLO it as needed and let the agent do all the work it needs to without pestering you for permission to run things. However (and it's a biggie); it has unrestricted access to your entire filesystem  -  SSH keys, dotfiles, credentials, other projects, everything. 
 
 I've seen some unfortunate incidents posted online where Claude has gone haywire and deleted precious family photos, entire repositories etc.
 
