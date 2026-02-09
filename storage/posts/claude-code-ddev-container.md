@@ -111,10 +111,10 @@ composer_version: "2"
 DDEV lets you extend its web container image with custom Dockerfiles. Create the file `.ddev/web-build/Dockerfile`:
 
 ```dockerfile
-RUN npm install -g @anthropic-ai/claude-code
+RUN curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-That's it  -  one line. DDEV's base image already includes Node.js (at the version you set in `config.yaml`), so `npm install -g` works directly. This Dockerfile gets appended to DDEV's own image build during `ddev start`.
+That's it  -  one line. This uses the official installer recommended by Anthropic (npm installation is deprecated). The Dockerfile gets appended to DDEV's own image build during `ddev start`.
 
 ### 3. Set your API key
 
