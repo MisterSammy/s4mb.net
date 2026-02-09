@@ -10,15 +10,9 @@ slug: building-a-24-7-hls-livestream-from-a-media-library-in-laravel
 This is a tech demo and would need more thought for a production system.
 :::
 
-I had a collection of live performance videos I'd gathered over the years—concert recordings, festival sets, intimate venue sessions. They sat in folders, rarely watched, because opening a file browser and choosing what to play felt like work. What I actually wanted was a TV channel. Tune in, see a band playing live, no decisions required.
+I built a system that turns a video library into a 24/7 broadcast. All viewers see the same content at the same time. I wanted a way to collect live music performances into a contstant stream.
 
-There's something exhausting about the modern streaming experience. Everything is on-demand, which sounds like freedom but often feels like a burden. Netflix asks what you want to watch. Spotify asks what you want to hear. Every interaction starts with a choice, and choice fatigue is real. Sometimes you just want to put something on and let it play.
-
-Old TV understood this well. You'd flip to a channel, and something was already happening. You didn't pick the show—you discovered it mid-stream. There was a serendipity to it, a shared experience with whoever else was watching at that moment.
-
-So I built a system that turns a video library into a 24/7 broadcast. All viewers see the same content at the same time. Late joiners sync up immediately. It's not video-on-demand—it's a channel.
-
-The idea quickly expanded beyond live music. The same architecture could power a retro TV channel cycling through old cartoons and classic shows for a nostalgia hit. Or a study channel with lo-fi visuals. Or a virtual fireplace that's always burning. Any collection of videos becomes a synchronized broadcast.
+The same architecture could power a retro TV channel cycling through old cartoons and classic shows for a nostalgia hit. Or a study channel with lo-fi visuals. Or a virtual fireplace that's always burning. Any collection of videos becomes a synchronized broadcast.
 
 If you want to turn a video library into a continuous broadcast, the architecture is simpler than you'd expect. Pre-transcode videos to HLS segments once, then generate playlists dynamically based on the current time.
 
