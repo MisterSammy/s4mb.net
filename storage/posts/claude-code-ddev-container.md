@@ -10,7 +10,7 @@ Claude Code is powerful, but running it with `--dangerously-skip-permissions` on
 
 I've seen some unfortunate incidents posted online where Claude has gone haywire and deleted precious family photos, entire repositories etc.
 
-One approach to containing this is running Claude Code inside an isolated environment. Emil Burzo wrote about doing this with a Vagrant VM (https://blog.emilburzo.com/2026/01/running-claude-code-dangerously-safely/); thanks for the inspo Emil. This guide uses Docker containers via DDEV, with VS Code attached directly to the container.
+One approach to containing this is running Claude Code inside an isolated environment. Emil Burzo wrote about doing this with a Vagrant VM (https://blog.emilburzo.com/2026/01/running-claude-code-dangerously-safely/). Thanks for the inspiration, Emil. This guide uses Docker containers via DDEV, with VS Code attached directly to the container.
 
 ---
 
